@@ -56,6 +56,13 @@ function startStage(index) {
   header.innerHTML = `<h2>ステージ${index + 1}: ${stage.title}</h2><p class="stage-sub">${stage.sub}</p>`;
   gameArea.appendChild(header);
 
+  if (stage.dialogue) {
+    const dialogScene = document.createElement("div");
+    dialogScene.className = "dialog-scene";
+    dialogScene.innerHTML = renderDialogue(stage.dialogue);
+    gameArea.appendChild(dialogScene);
+  }
+
   const body = document.createElement("div");
   gameArea.appendChild(body);
 
@@ -78,6 +85,7 @@ function finishGame() {
   gameArea.innerHTML = "";
   document.getElementById("end-score").textContent = `最終スコア: ${state.score} 点`;
   document.getElementById("end-summary").innerHTML = `
+    <div class="dialog-scene">${renderDialogue(CLEAR_DIALOGUE)}</div>
     <ul class="explain-list">
       <li><b>DNS</b>：ドメイン名をIPアドレスに変換する「電話帳」の役割</li>
       <li><b>ルーティング</b>：宛先IPのサブネットを見て次の転送先を決める仕組み</li>
@@ -109,6 +117,21 @@ function matchesCidr(ip, cidr) {
   const [base, bits] = cidr.split("/");
   const mask = bits === "0" ? 0 : (~0 << (32 - Number(bits))) >>> 0;
   return (ipToInt(ip) & mask) === (ipToInt(base) & mask);
+}
+
+function renderDialogue(dialogue) {
+  return dialogue
+    .map((d) => {
+      const isRabbit = d.who === "rabbit";
+      return `<div class="dialog-row${isRabbit ? " right" : ""}">
+        <div class="dialog-character">
+          <img src="images/${d.img}.png" alt="${isRabbit ? "うさ美" : "ねこ先生"}">
+          <div class="dialog-name ${d.who}">${isRabbit ? "うさ美" : "ねこ先生"}</div>
+        </div>
+        <div class="dialog-bubble">${d.text}</div>
+      </div>`;
+    })
+    .join("");
 }
 
 function appendNextButton(parent, onClick) {
@@ -719,6 +742,15 @@ function renderFirewallStage(container, onComplete) {
 }
 
 /* =========================================================
+   キャラクター会話（ねこ先生 / うさ美）
+========================================================= */
+const CLEAR_DIALOGUE = [
+  { who: "cat", img: "cat", text: "お疲れさま！これで、1つのデータがクライアントからサーバーまで届く流れを、一通り体験したことになるよ。" },
+  { who: "rabbit", img: "rabbitThink", text: "DNSで住所を調べて、ルーターをリレーして、あいさつ（ハンドシェイク）して、正しい窓口（ポート）に届けて……途中で消えても再送されて、最後は門番（ファイアウォール）がチェックする。全部つながりました！" },
+  { who: "cat", img: "catThink", text: "普段何気なく見ているWebページの裏側では、これだけの仕組みが動いているんだ。お疲れさま！" }
+];
+
+/* =========================================================
    ステージ定義
 ========================================================= */
 const STAGES = [
@@ -726,6 +758,13 @@ const STAGES = [
     title: "DNS解決",
     sub: "ドメイン名からIPアドレスを調べよう",
     render: renderDnsStage,
+    dialogue: [
+      { who: "cat", img: "cat", text: "ようこそ、パケット大冒険へ！まずは「ドメイン名からIPアドレスを調べる」ところから始めよう。" },
+      { who: "rabbit", img: "rabbit", text: "ドメイン名……www.example.comみたいなやつですよね？でも、それがどうやってIPアドレスになるんですか？" },
+      { who: "cat", img: "catThink", text: "いい質問！コンピューター同士は住所（IPアドレス）でしか通信できないんだ。だから「ドメイン名→IPアドレス」の対応表を持っている<strong>DNSサーバー</strong>に、まず聞きにいく必要があるんだよ。" },
+      { who: "rabbit", img: "rabbitThink", text: "普段パソコンで<strong>nslookup</strong>や<strong>dig</strong>というコマンドを打つと、それが見られるんですよね？" },
+      { who: "cat", img: "cat", text: "そうそう！ブラウザも裏側で必ず同じことをしているんだ。このステージでは「問い合わせる」ボタンを押して、実際にDNSサーバーから答えが返ってくる様子を見てみよう。" }
+    ],
     explainTitle: "DNSは「電話帳」",
     explainBody: `
       <p>私たちが普段入力する「www.example.com」のようなドメイン名は、コンピューターにとっては直接の宛先になりません。通信には<b>IPアドレス</b>が必要です。</p>
@@ -737,6 +776,13 @@ const STAGES = [
     title: "ルーティング",
     sub: "宛先IPに合わせて次のルーターへ転送しよう",
     render: renderRoutingStage,
+    dialogue: [
+      { who: "rabbit", img: "rabbit", text: "IPアドレスが分かったので、あとはそこに向かって送るだけですよね？" },
+      { who: "cat", img: "cat", text: "それが単純じゃないんだ。インターネットは一本道でつながっているわけじゃなくて、<strong>ルーター</strong>を何台も経由してリレーされていくんだよ。" },
+      { who: "rabbit", img: "rabbitThink", text: "駅伝みたいな感じですか？" },
+      { who: "cat", img: "catThink", text: "まさにそれ！各ルーターは「このIP範囲（サブネット）宛てなら次はこっち」という案内表（ルーティングテーブル）を持っていて、宛先IPを見て次の担当ルーターにバトンタッチしていくんだ。" },
+      { who: "rabbit", img: "rabbit", text: "なるほど、宛先の住所を見て「担当エリア」を探せばいいんですね。やってみます！" }
+    ],
     explainTitle: "ルーティング＝転送先の判断",
     explainBody: `
       <p>インターネット上のデータは、宛先まで一直線につながっているわけではなく、<b>ルーター</b>を何台も経由して届けられます。</p>
@@ -747,6 +793,13 @@ const STAGES = [
     title: "TCP 3ウェイハンドシェイク",
     sub: "接続を確立する正しい手順を体験しよう",
     render: renderHandshakeStage,
+    dialogue: [
+      { who: "cat", img: "cat", text: "次は、通信を始める前の「あいさつ」の話だよ。TCPで通信するときは、いきなりデータを送らずに<strong>3ウェイハンドシェイク</strong>という手順を踏むんだ。" },
+      { who: "rabbit", img: "rabbit", text: "あいさつ……？いきなり話しかけちゃダメなんですか？" },
+      { who: "cat", img: "catThink", text: "ダメというか非効率なんだ。相手が本当に応答できる状態か確認せずに送ると、届かなかったときに困るだろ？だから<strong>SYN→SYN/ACK→ACK</strong>の3回のやり取りで、お互いに「準備OK」を確認し合うんだよ。" },
+      { who: "rabbit", img: "rabbitThink", text: "電話で「もしもし」「はい、聞こえてます」「じゃあ話します」ってやるのと似てますね。" },
+      { who: "cat", img: "cat", text: "いい例えだね！その順番を、実際にボタンを押して組み立ててみよう。" }
+    ],
     explainTitle: "接続はいきなり始まらない",
     explainBody: `
       <p>Webサイトを見るときなど、多くの通信は<b>TCP</b>というプロトコルを使いますが、データを送る前に必ず接続を確立する手順を踏みます。それが<b>3ウェイハンドシェイク</b>です。</p>
@@ -762,6 +815,13 @@ const STAGES = [
     title: "ポート番号",
     sub: "同じサーバーでもアプリごとに窓口が違う",
     render: renderPortStage,
+    dialogue: [
+      { who: "rabbit", img: "rabbit", text: "IPアドレスでサーバーまでは届きましたよね。でも1台のサーバーに、Webもメールもデータも全部同居してたら、どこに届けばいいんですか？" },
+      { who: "cat", img: "cat", text: "そこで登場するのが<strong>ポート番号</strong>だよ。IPアドレスが「建物の住所」だとすると、ポート番号は「建物の中の部屋番号・窓口」なんだ。" },
+      { who: "rabbit", img: "rabbitThink", text: "同じ建物でも、1階が受付、2階が郵便窓口……みたいな感じですか？" },
+      { who: "cat", img: "catThink", text: "そのイメージでOK！HTTPS（暗号化されたWeb）は<strong>443番</strong>、HTTPは<strong>80番</strong>というふうに、使うサービスごとに決まった窓口番号があるんだよ。" },
+      { who: "rabbit", img: "rabbit", text: "覚えることが多そうですが、まずはやってみます！" }
+    ],
     explainTitle: "ポート番号＝アプリの窓口",
     explainBody: `
       <p>1台のサーバーでも、Webサーバー・メールサーバー・DNSサーバーなど複数のサービスが同時に動いていることがあります。それらを区別するのが<b>ポート番号</b>です。</p>
@@ -772,6 +832,13 @@ const STAGES = [
     title: "パケットロス＆再送",
     sub: "ロスを避けつつ、失敗しても再送で届ける",
     render: renderLossStage,
+    dialogue: [
+      { who: "cat", img: "cat", text: "ネットワークって実は完璧じゃないんだ。混雑や障害で、送ったデータの一部が<strong>途中で消えてしまう</strong>ことがある。これを<strong>パケットロス</strong>と呼ぶよ。" },
+      { who: "rabbit", img: "rabbitThink", text: "えっ、データが消えちゃったら通信って失敗しちゃうじゃないですか！？" },
+      { who: "cat", img: "catThink", text: "普通ならそうなんだけど、TCPには保険がかかっているんだ。送ったデータへの確認応答（ACK）が一定時間内に返ってこないと、「届かなかった」と判断して自動的に<strong>再送</strong>してくれる。" },
+      { who: "rabbit", img: "rabbit", text: "届くまで何度もリトライしてくれるから、多少ロスしても最終的にはちゃんと届くんですね。" },
+      { who: "cat", img: "cat", text: "その通り！実際にロスを避けながら、届かなかったときは再送される様子を体験してみよう。" }
+    ],
     explainTitle: "届かなければ、もう一度送る",
     explainBody: `
       <p>ネットワークでは、混雑や障害によって一部のデータ（パケット）が失われる<b>パケットロス</b>が起こります。</p>
@@ -782,6 +849,13 @@ const STAGES = [
     title: "ファイアウォール",
     sub: "ルールに従って通信を許可・拒否しよう",
     render: renderFirewallStage,
+    dialogue: [
+      { who: "rabbit", img: "rabbit", text: "ここまででサーバーまで通信が届くようになりましたけど……誰でも自由に送っていいんですか？なんだか不安です。" },
+      { who: "cat", img: "cat", text: "いいところに気づいたね。実際のネットワークには、通信を選別する門番役の<strong>ファイアウォール</strong>がいるんだ。" },
+      { who: "rabbit", img: "rabbitThink", text: "門番さんは、何を見て通す・通さないを決めるんですか？" },
+      { who: "cat", img: "catThink", text: "主に<strong>プロトコルとポート番号</strong>だよ。「Webの通信（80/443）とDNS（53）だけ通す。それ以外は全部止める」みたいなルールを決めておくんだ。" },
+      { who: "rabbit", img: "rabbit", text: "最後は自分がその門番になって判定してみればいいんですね！" }
+    ],
     explainTitle: "ファイアウォールは門番",
     explainBody: `
       <p><b>ファイアウォール</b>は、あらかじめ決められたルール（プロトコルやポート番号など）に基づいて、通信を通す（許可）か止める（拒否）かを判断する仕組みです。</p>
