@@ -114,76 +114,112 @@ function matchesCidr(ip, cidr) {
 /* =========================================================
    ステージ1: DNS解決
 ========================================================= */
-const DNS_QUESTIONS = [
-  {
-    domain: "www.example.com",
-    correct: "93.184.216.34",
-    options: ["93.184.216.34", "10.0.0.5", "172.16.254.1", "198.18.0.9"]
-  },
-  {
-    domain: "mail.acme.co.jp",
-    correct: "203.0.113.10",
-    options: ["192.0.2.44", "203.0.113.10", "10.10.10.10", "203.0.113.99"]
-  },
-  {
-    domain: "shop.example.net",
-    correct: "198.51.100.7",
-    options: ["198.51.100.7", "198.51.100.70", "192.168.1.7", "203.0.113.7"]
-  }
+const DNS_ROUNDS = [
+  { type: "lookup", domain: "www.example.com", ip: "93.184.216.34" },
+  { type: "cache", domain: "www.example.com", ip: "93.184.216.34" },
+  { type: "lookup", domain: "shop.example.net", ip: "198.51.100.7" }
 ];
 
 function renderDnsStage(container, onComplete) {
   let round = 0;
-  let correctCount = 0;
 
   function renderRound() {
     container.innerHTML = "";
-    const q = DNS_QUESTIONS[round];
+    const r = DNS_ROUNDS[round];
+    if (r.type === "cache") {
+      renderCacheRound(r);
+    } else {
+      renderLookupRound(r);
+    }
+  }
 
+  function renderLookupRound(r) {
     const panel = document.createElement("div");
     panel.className = "panel";
     panel.innerHTML = `
       <div class="topology">
         <div class="node"><span class="node-icon">🖥️</span>クライアント</div>
-        <span class="arrow">→ 問い合わせ →</span>
-        <div class="node active"><span class="node-icon">📖</span>DNSサーバー</div>
-        <span class="arrow">→ 応答 →</span>
-        <div class="node target"><span class="node-icon">🌐</span>${q.domain}</div>
+        <span class="arrow">→</span>
+        <div class="node" id="dns-server-node"><span class="node-icon">📖</span>DNSサーバー</div>
+        <span class="arrow">→</span>
+        <div class="node target"><span class="node-icon">🌐</span>${r.domain}</div>
       </div>
-      <p>「<b>${q.domain}</b>」にアクセスしたい。DNSサーバーに問い合わせた結果、正しいIPアドレスはどれ？</p>
-      <div class="card-row" id="dns-choices"></div>
-      <div class="feedback" id="dns-feedback"></div>
+      <p>「<b>${r.domain}</b>」にアクセスしたい。まだIPアドレスが分からないので、DNSサーバーに問い合わせてみよう。</p>
+      <div style="text-align:center;">
+        <button type="button" class="btn primary" id="dns-query-btn">DNSサーバーに問い合わせる</button>
+      </div>
+      <div class="feedback" id="dns-feedback" style="text-align:center;"></div>
+      <div style="text-align:center;" id="dns-next-wrap"></div>
     `;
     container.appendChild(panel);
 
-    const choicesEl = panel.querySelector("#dns-choices");
+    const queryBtn = panel.querySelector("#dns-query-btn");
     const feedback = panel.querySelector("#dns-feedback");
+    const serverNode = panel.querySelector("#dns-server-node");
+    const nextWrap = panel.querySelector("#dns-next-wrap");
+
+    queryBtn.onclick = () => {
+      queryBtn.disabled = true;
+      serverNode.classList.add("active");
+      feedback.textContent = "問い合わせ中…";
+      feedback.className = "feedback";
+      setTimeout(() => {
+        feedback.innerHTML = `DNSサーバーが回答: <b>${r.domain}</b> のIPアドレスは <b style="color:var(--accent)">${r.ip}</b> です。`;
+        feedback.className = "feedback ok";
+        addScore(10);
+        const nextBtn = document.createElement("button");
+        nextBtn.type = "button";
+        nextBtn.className = "btn primary";
+        nextBtn.style.marginTop = "14px";
+        nextBtn.textContent = "次へ";
+        nextBtn.onclick = advance;
+        nextWrap.appendChild(nextBtn);
+      }, 700);
+    };
+  }
+
+  function renderCacheRound(r) {
+    const panel = document.createElement("div");
+    panel.className = "panel";
+    panel.innerHTML = `
+      <div class="scenario-box">少し前に <b>${r.domain}</b>（IP: ${r.ip}）へアクセスしたばかりです。今、もう一度同じサイトにアクセスします。</div>
+      <p>ブラウザやOSは、一度調べたドメインの結果を一定時間（TTL）保存しています。今回、実際に起きるのはどちら？</p>
+      <div class="card-row" id="cache-choices" style="justify-content:center;"></div>
+      <div class="feedback" id="cache-feedback" style="text-align:center;"></div>
+    `;
+    container.appendChild(panel);
+
+    const choicesEl = panel.querySelector("#cache-choices");
+    const feedback = panel.querySelector("#cache-feedback");
     let answered = false;
 
-    shuffle(q.options).forEach((opt) => {
+    const options = shuffle([
+      { key: "cache", label: "キャッシュ済みのIPアドレスをそのまま使う（DNSサーバーに問い合わせない）" },
+      { key: "query", label: "もう一度DNSサーバーに問い合わせる" }
+    ]);
+
+    options.forEach((opt) => {
       const btn = document.createElement("button");
       btn.type = "button";
       btn.className = "choice-btn";
-      btn.textContent = opt;
+      btn.textContent = opt.label;
       btn.onclick = () => {
         if (answered) return;
         answered = true;
-        if (opt === q.correct) {
+        if (opt.key === "cache") {
           btn.classList.add("correct");
-          feedback.textContent = "正解！ このIPアドレス宛てに通信が行われます。";
+          feedback.textContent = "正解！ TTL（有効期限）が切れるまではキャッシュされたIPアドレスを再利用し、DNSサーバーへの問い合わせを省略します。通信が速くなり、DNSサーバーの負荷も減ります。";
           feedback.className = "feedback ok";
-          correctCount++;
           addScore(10);
-          setTimeout(advance, 900);
         } else {
           btn.classList.add("wrong");
-          feedback.textContent = `不正解。正しいIPアドレスは ${q.correct} でした。`;
+          feedback.textContent = "実際はキャッシュが使われます。TTLが切れるまでは、同じドメインに毎回問い合わせる必要はありません。";
           feedback.className = "feedback ng";
           [...choicesEl.children].forEach((c) => (c.disabled = true));
-          const correctBtn = [...choicesEl.children].find((c) => c.textContent === q.correct);
+          const correctBtn = [...choicesEl.children].find((c) => c.textContent.includes("キャッシュ済み"));
           if (correctBtn) correctBtn.classList.add("correct");
-          setTimeout(advance, 1400);
         }
+        setTimeout(advance, 1800);
       };
       choicesEl.appendChild(btn);
     });
@@ -191,7 +227,7 @@ function renderDnsStage(container, onComplete) {
 
   function advance() {
     round++;
-    if (round >= DNS_QUESTIONS.length) {
+    if (round >= DNS_ROUNDS.length) {
       onComplete();
     } else {
       renderRound();
@@ -682,6 +718,7 @@ const STAGES = [
     explainBody: `
       <p>私たちが普段入力する「www.example.com」のようなドメイン名は、コンピューターにとっては直接の宛先になりません。通信には<b>IPアドレス</b>が必要です。</p>
       <p><b>DNS（Domain Name System）</b>は、ドメイン名を対応するIPアドレスに変換してくれる仕組みで、よく「インターネットの電話帳」と例えられます。ブラウザは裏側で必ずこのDNS問い合わせを行ってから、実際の通信を開始しています。</p>
+      <p>また、一度調べた結果は<b>キャッシュ</b>として一定時間（TTL）保存されるため、同じサイトに何度もアクセスしても毎回DNSサーバーに問い合わせる必要はありません。</p>
     `
   },
   {
