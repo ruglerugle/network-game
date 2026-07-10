@@ -111,6 +111,19 @@ function matchesCidr(ip, cidr) {
   return (ipToInt(ip) & mask) === (ipToInt(base) & mask);
 }
 
+function appendNextButton(parent, onClick) {
+  const wrap = document.createElement("div");
+  wrap.style.textAlign = "center";
+  wrap.style.marginTop = "14px";
+  const btn = document.createElement("button");
+  btn.type = "button";
+  btn.className = "btn primary";
+  btn.textContent = "次へ";
+  btn.onclick = onClick;
+  wrap.appendChild(btn);
+  parent.appendChild(wrap);
+}
+
 /* =========================================================
    ステージ1: DNS解決
 ========================================================= */
@@ -219,7 +232,7 @@ function renderDnsStage(container, onComplete) {
           const correctBtn = [...choicesEl.children].find((c) => c.textContent.includes("キャッシュ済み"));
           if (correctBtn) correctBtn.classList.add("correct");
         }
-        setTimeout(advance, 1800);
+        appendNextButton(panel, advance);
       };
       choicesEl.appendChild(btn);
     });
@@ -301,7 +314,6 @@ function renderRoutingStage(container, onComplete) {
           feedback.textContent = `正解！ ${r.destIP} は ${rt.cidr} の範囲に含まれるので ${rt.id} へ転送されます。`;
           feedback.className = "feedback ok";
           addScore(10);
-          setTimeout(advance, 1000);
         } else {
           btn.classList.add("wrong");
           feedback.textContent = `不正解。${r.destIP} は ${correctRouter.cidr}（${correctRouter.id}）の範囲です。`;
@@ -309,8 +321,8 @@ function renderRoutingStage(container, onComplete) {
           [...choicesEl.children].forEach((c) => (c.disabled = true));
           const correctBtn = [...choicesEl.children].find((c) => c.innerHTML.includes(correctRouter.id));
           if (correctBtn) correctBtn.classList.add("correct");
-          setTimeout(advance, 1600);
         }
+        appendNextButton(panel, advance);
       };
       choicesEl.appendChild(btn);
     });
@@ -385,7 +397,8 @@ function renderHandshakeStage(container, onComplete) {
       step++;
       if (step >= sequence.length) {
         feedback.textContent = "3ウェイハンドシェイク完了！接続が確立しました。";
-        setTimeout(onComplete, 1000);
+        pool.innerHTML = "";
+        appendNextButton(container.querySelector(".panel"), onComplete);
       }
     } else {
       feedback.textContent = "順番が違います。今どちらが何を送るタイミングか考えてみましょう。";
@@ -439,7 +452,6 @@ function renderPortStage(container, onComplete) {
           feedback.textContent = `正解！ ポート${p}（${r.labels[p]}）宛てに届けられました。`;
           feedback.className = "feedback ok";
           addScore(10);
-          setTimeout(advance, 900);
         } else {
           door.classList.add("wrong");
           feedback.textContent = `不正解。正しくはポート${r.correct}（${r.labels[r.correct]}）です。`;
@@ -447,8 +459,8 @@ function renderPortStage(container, onComplete) {
           [...doorsEl.children].forEach((d) => (d.style.pointerEvents = "none"));
           const correctDoor = [...doorsEl.children].find((d) => d.querySelector(".port-num").textContent == r.correct);
           if (correctDoor) correctDoor.classList.add("correct");
-          setTimeout(advance, 1400);
         }
+        appendNextButton(panel, advance);
       };
       doorsEl.appendChild(door);
     });
@@ -565,7 +577,7 @@ function renderLossStage(container, onComplete) {
       feedback.className = "feedback ok";
       document.removeEventListener("keydown", onKey);
       addScore(Math.max(10, 40 - retransCount * 5));
-      setTimeout(onComplete, 900);
+      appendNextButton(container.querySelector(".panel"), onComplete);
       return;
     }
 
@@ -687,7 +699,7 @@ function renderFirewallStage(container, onComplete) {
         feedback.textContent = `不正解。ルール上、この通信は「${allowed ? "許可" : "拒否"}」されるべきでした。`;
         feedback.className = "feedback ng";
       }
-      setTimeout(advance, 1200);
+      appendNextButton(panel, advance);
     }
 
     allowBtn.onclick = () => judge(true);
