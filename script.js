@@ -74,6 +74,116 @@ function renderSideNav() {
 }
 
 /* =========================================================
+   用語集ポップアップ
+========================================================= */
+const GLOSSARY = [
+  { term: "OSI参照モデル", def: "通信を7つの階層に分けて役割分担する考え方。" },
+  { term: "カプセル化", def: "上位層から下位層に渡る際、各層が自分の役割に必要なヘッダーを付け足していく処理。" },
+  { term: "キャッシュDNSサーバー", def: "クライアントの代わりに再帰的に問い合わせを行い、結果を一定時間保存するDNSサーバー。" },
+  { term: "権威DNSサーバー", def: "そのドメインの正式な情報（IPアドレス等）を管理しているDNSサーバー。" },
+  { term: "再帰問い合わせ", def: "答えが出るまでDNSサーバーに代わりに調べてきてもらう問い合わせ方式。" },
+  { term: "反復問い合わせ", def: "知っていれば教えて、知らなければ次に聞くべき場所を教えて、と順にたどっていく問い合わせ方式。" },
+  { term: "DNSキャッシュポイズニング", def: "DNSの応答を偽造し、悪意あるサイトへ誘導する攻撃。" },
+  { term: "DNSSEC", def: "DNSの応答にデジタル署名を付け、改ざんを検知できるようにする仕組み。" },
+  { term: "AAAAレコード", def: "ドメイン名に対応するIPv6アドレスを示すDNSレコード。" },
+  { term: "CNAMEレコード", def: "別のドメイン名への別名（エイリアス）を示すDNSレコード。" },
+  { term: "Aレコード", def: "ドメイン名に対応するIPv4アドレスを示すDNSレコード。" },
+  { term: "TTL", def: "キャッシュの有効期限、またはルーティングでのパケットの生存時間（Time To Live）。" },
+  { term: "HTTPメソッド", def: "GET・POSTなど、HTTPリクエストの目的を表す種別。" },
+  { term: "ステータスコード", def: "サーバーからのHTTP応答結果を表す3桁の数字（200・404など）。" },
+  { term: "ステートレス", def: "サーバーが前回のやり取りを覚えていない性質。HTTP自体はこの性質を持つ。" },
+  { term: "HTTP/2", def: "1本の接続で複数のリクエストを並行処理できる（多重化）HTTPのバージョン。" },
+  { term: "HTTP/3", def: "TCPの代わりにQUICを使う、最新のHTTPのバージョン。" },
+  { term: "QUIC", def: "UDPをベースにした、HTTP/3で使われる新しいトランスポートプロトコル。" },
+  { term: "Cookie", def: "サーバーが発行し、ブラウザが保存・送信する識別情報。ログイン状態の維持などに使う。" },
+  { term: "TLSハンドシェイク", def: "TLSで暗号化通信を始める前に行う、鍵の交換や身元確認の手順。" },
+  { term: "共通鍵暗号", def: "暗号化と復号に同じ鍵を使う方式。処理は高速だが鍵の受け渡しが課題。" },
+  { term: "公開鍵暗号", def: "暗号化用の公開鍵と復号用の秘密鍵がペアになっている暗号方式。" },
+  { term: "デジタル証明書", def: "サーバーの身元を証明する電子的な証明書。認証局が発行する。" },
+  { term: "認証局", def: "デジタル証明書を発行する、信頼された第三者機関（CA）。" },
+  { term: "SNI", def: "TLS接続の最初に、アクセス先のドメイン名をサーバーに伝える仕組み。" },
+  { term: "MACアドレステーブル", def: "スイッチが学習した、MACアドレスとポートの対応表。" },
+  { term: "MACアドレス", def: "ネットワーク機器のインターフェースに割り当てられた固有の識別番号。" },
+  { term: "フラッディング", def: "宛先MACアドレスが分からないフレームを、学習済みポート以外の全ポートに送る動作。" },
+  { term: "コリジョンドメイン", def: "信号の衝突が起こりうる範囲。" },
+  { term: "ブロードキャストドメイン", def: "ブロードキャスト（宛先を全員にした通信）が届く範囲。" },
+  { term: "トランクポート", def: "複数のVLANのフレームをタグ付きでまとめて運ぶスイッチのポート。" },
+  { term: "アクセスポート", def: "特定の1つのVLANのみに属する、通常のスイッチのポート。" },
+  { term: "VLAN", def: "1台の物理スイッチを、論理的に複数のネットワークへ分割する技術。" },
+  { term: "ルーティングテーブル", def: "宛先のIPアドレス範囲ごとに、次の転送先を記録した表。" },
+  { term: "デフォルトゲートウェイ", def: "宛先が自分の知っている範囲になかったときに、とりあえず転送する先。" },
+  { term: "スタティックルーティング", def: "管理者が手動で経路を設定するルーティング方式。" },
+  { term: "ダイナミックルーティング", def: "ルーター同士が経路情報を自動的に交換し合うルーティング方式。" },
+  { term: "CIDR", def: "IPアドレスの範囲を「/24」のようにスラッシュ以降の数字で表す表記法。" },
+  { term: "ARP", def: "IPアドレスから、それに対応するMACアドレスを調べる仕組み。" },
+  { term: "NAT", def: "プライベートIPアドレスをグローバルIPアドレスに変換する仕組み。" },
+  { term: "BGP", def: "インターネット全体で経路情報を交換するルーティングプロトコル。" },
+  { term: "OSPF", def: "組織内ネットワーク向けの代表的な動的ルーティングプロトコル。" },
+  { term: "4ウェイハンドシェイク", def: "FIN/ACKのやり取りを双方向で行い、TCP接続を終了する手順。" },
+  { term: "3ウェイハンドシェイク", def: "SYN→SYN/ACK→ACKの3回のやり取りで、TCP接続を確立する手順。" },
+  { term: "シーケンス番号", def: "送ったデータの位置を管理するためにTCPが振る番号。" },
+  { term: "スライディングウィンドウ", def: "確認応答を待たずに、複数のデータをまとめて送る仕組み。" },
+  { term: "輻輳制御", def: "ネットワークの混雑状況に応じて、送信量を調整する仕組み。" },
+  { term: "スロースタート", def: "TCP通信の開始直後、送信量を少しずつ倍増させていく輻輳制御の一種。" },
+  { term: "RTT", def: "パケットが相手まで届いて応答が返ってくるまでの往復時間。" },
+  { term: "RTO", def: "再送するかどうかを判断するために待つタイムアウト時間。" },
+  { term: "ポートフォワーディング", def: "外部からの通信を、内部の特定の機器・ポートへ転送するルーターの設定。" },
+  { term: "ソケット", def: "IPアドレスとポート番号の組み合わせ。通信の相手を一意に特定する。" },
+  { term: "ステートフルインスペクション", def: "通信の状態（返信かどうか等）を記憶しながら判定するファイアウォール方式。" },
+  { term: "ACL", def: "許可・拒否のルールを順に並べた一覧（Access Control List）。" },
+  { term: "DMZ", def: "社内ネットワークとインターネットの間に設ける緩衝地帯。" },
+  { term: "NGFW", def: "ポート番号だけでなくアプリ層の中身まで検査する次世代ファイアウォール。" },
+  { term: "IDS", def: "通信の中身を分析し、不審な兆候を検知・通知するシステム。" },
+  { term: "IPS", def: "不審な通信を検知し、自動的に遮断するところまで行うシステム。" }
+];
+
+function glossify(html) {
+  const terms = GLOSSARY.map((g) => g.term).sort((a, b) => b.length - a.length);
+  const placeholders = [];
+  const parts = html.split(/(<[^>]+>)/);
+  const withPlaceholders = parts
+    .map((part, i) => {
+      if (i % 2 === 1) return part;
+      return terms.reduce((s, t) => {
+        if (!s.includes(t)) return s;
+        const idx = placeholders.length;
+        placeholders.push(`<span class="gloss-term" onclick="showGloss(this,'${t}')">${t}</span>`);
+        return s.split(t).join(`\x00${idx}\x00`);
+      }, part);
+    })
+    .join("");
+  return withPlaceholders.replace(/\x00(\d+)\x00/g, (_, i) => placeholders[+i]);
+}
+
+function showGloss(el, term) {
+  const g = GLOSSARY.find((x) => x.term === term);
+  if (!g) return;
+  document.getElementById("gloss-term-title").textContent = g.term;
+  document.getElementById("gloss-def").textContent = g.def;
+  const pop = document.getElementById("gloss-popup");
+  pop.style.display = "block";
+  const r = el.getBoundingClientRect();
+  const pw = Math.min(280, window.innerWidth - 32);
+  let left = r.left;
+  if (left + pw > window.innerWidth - 8) left = window.innerWidth - pw - 8;
+  if (left < 8) left = 8;
+  const top = r.bottom + 6;
+  pop.style.left = `${left}px`;
+  pop.style.top = `${top}px`;
+  pop.style.width = `${pw}px`;
+}
+
+function closeGloss() {
+  document.getElementById("gloss-popup").style.display = "none";
+}
+
+document.addEventListener("click", (e) => {
+  if (!e.target.closest("#gloss-popup") && !e.target.classList.contains("gloss-term")) {
+    closeGloss();
+  }
+});
+
+/* =========================================================
    解説モーダル
 ========================================================= */
 const explainModal = document.getElementById("explain-modal");
@@ -83,7 +193,7 @@ const explainNextBtn = document.getElementById("explain-next-btn");
 
 function showExplain(title, bodyHtml, onNext) {
   explainTitle.textContent = title;
-  explainBody.innerHTML = bodyHtml;
+  explainBody.innerHTML = glossify(bodyHtml);
   explainModal.classList.remove("hidden");
   explainNextBtn.onclick = () => {
     explainModal.classList.add("hidden");
@@ -186,7 +296,7 @@ function renderDialogue(dialogue) {
           <img src="images/${d.img}.png" alt="${isRabbit ? "うさ美" : "ねこ先生"}">
           <div class="dialog-name ${d.who}">${isRabbit ? "うさ美" : "ねこ先生"}</div>
         </div>
-        <div class="dialog-bubble">${d.text}</div>
+        <div class="dialog-bubble">${glossify(d.text)}</div>
       </div>`;
     })
     .join("");

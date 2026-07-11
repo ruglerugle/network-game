@@ -552,6 +552,44 @@ body::before {
 .explain-list { padding-left: 20px; }
 .explain-list li { margin-bottom: 6px; font-weight: 700; }
 
+/* ---------- glossary term popup ---------- */
+.gloss-term {
+  color: var(--fac);
+  text-decoration: underline;
+  text-decoration-style: dotted;
+  text-underline-offset: 3px;
+  cursor: pointer;
+}
+.gloss-term:hover, .gloss-term:active { background: var(--ac); border-radius: 2px; }
+#gloss-popup {
+  display: none;
+  position: fixed;
+  z-index: 200;
+  background: #fff;
+  color: var(--ink);
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  padding: 14px 18px 14px 14px;
+  box-shadow: var(--shadow);
+  max-width: 280px;
+  width: calc(100vw - 32px);
+}
+#gloss-popup strong { display: block; margin-bottom: 0.5rem; font-size: 14px; color: var(--ink); }
+#gloss-popup p { color: var(--muted); line-height: 1.65; font-size: 13px; margin: 0; font-weight: 700; }
+#gloss-close {
+  position: absolute;
+  top: 6px;
+  right: 8px;
+  background: none;
+  border: none;
+  cursor: pointer;
+  color: var(--muted);
+  font-size: 18px;
+  line-height: 1;
+  padding: 2px 6px;
+  font-family: var(--f);
+}
+
 /* ---------- character dialogue (ねこ先生 / うさ美) ---------- */
 .dialog-scene {
   display: flex;
