@@ -5,13 +5,19 @@
 ========================================================= */
 const state = {
   stageIndex: -1,
+  maxReached: 0,
+  completed: new Set(),
   score: 0
 };
 
 const gameArea = document.getElementById("game-area");
 const stageIndicator = document.getElementById("stage-indicator");
 const scoreIndicator = document.getElementById("score-indicator");
-const progressFill = document.getElementById("progress-fill");
+const backBtn = document.getElementById("back-btn");
+const navToggleBtn = document.getElementById("nav-toggle-btn");
+const sideToggleBtn = document.getElementById("side-toggle-btn");
+const stepList = document.getElementById("step-list");
+const appEl = document.getElementById("app");
 
 function addScore(points) {
   state.score += points;
@@ -22,7 +28,47 @@ function updateHud() {
   const total = STAGES.length;
   const current = Math.min(Math.max(state.stageIndex, 0) + 1, total);
   stageIndicator.textContent = `ステージ ${current} / ${total}`;
-  progressFill.style.width = `${(Math.max(state.stageIndex, 0) / total) * 100}%`;
+  backBtn.disabled = state.stageIndex <= 0;
+}
+
+function toggleSidebar() {
+  appEl.classList.toggle("side-collapsed");
+}
+navToggleBtn.onclick = toggleSidebar;
+sideToggleBtn.onclick = toggleSidebar;
+
+backBtn.onclick = () => {
+  if (state.stageIndex > 0) {
+    startStage(state.stageIndex - 1);
+  }
+};
+
+function renderSideNav() {
+  stepList.innerHTML = STAGES.map((stage, i) => {
+    const reached = i <= state.maxReached;
+    const isActive = i === state.stageIndex;
+    const isDone = state.completed.has(i);
+    const classes = ["side-step"];
+    if (isActive) classes.push("active");
+    if (isDone) classes.push("done");
+    if (!reached) classes.push("locked");
+    const statusIcon = isDone ? '<span class="check">✔</span>' : !reached ? '<span class="lock">🔒</span>' : "";
+    return `<div class="${classes.join(" ")}" data-index="${i}">
+      <span class="paw">${stage.icon}</span>
+      <div>
+        <div class="step-main">ステージ${i + 1}</div>
+        <div class="step-sub">${stage.title}</div>
+      </div>
+      <div>${statusIcon}</div>
+    </div>`;
+  }).join("");
+
+  stepList.querySelectorAll(".side-step").forEach((el) => {
+    const i = Number(el.dataset.index);
+    if (i <= state.maxReached) {
+      el.addEventListener("click", () => startStage(i));
+    }
+  });
 }
 
 /* =========================================================
@@ -48,7 +94,9 @@ function showExplain(title, bodyHtml, onNext) {
 ========================================================= */
 function startStage(index) {
   state.stageIndex = index;
+  state.maxReached = Math.max(state.maxReached, index);
   updateHud();
+  renderSideNav();
   gameArea.innerHTML = "";
   const stage = STAGES[index];
   const header = document.createElement("div");
@@ -68,6 +116,8 @@ function startStage(index) {
 
   stage.render(body, () => {
     showExplain(stage.explainTitle, stage.explainBody, () => {
+      state.completed.add(index);
+      renderSideNav();
       const next = index + 1;
       if (next >= STAGES.length) {
         finishGame();
@@ -81,7 +131,7 @@ function startStage(index) {
 function finishGame() {
   state.stageIndex = STAGES.length;
   updateHud();
-  progressFill.style.width = "100%";
+  renderSideNav();
   gameArea.innerHTML = "";
   document.getElementById("end-score").textContent = `最終スコア: ${state.score} 点`;
   document.getElementById("end-summary").innerHTML = `
@@ -756,6 +806,7 @@ const CLEAR_DIALOGUE = [
 const STAGES = [
   {
     title: "DNS解決",
+    icon: "📖",
     sub: "ドメイン名からIPアドレスを調べよう",
     render: renderDnsStage,
     dialogue: [
@@ -774,6 +825,7 @@ const STAGES = [
   },
   {
     title: "ルーティング",
+    icon: "📡",
     sub: "宛先IPに合わせて次のルーターへ転送しよう",
     render: renderRoutingStage,
     dialogue: [
@@ -791,6 +843,7 @@ const STAGES = [
   },
   {
     title: "TCP 3ウェイハンドシェイク",
+    icon: "🤝",
     sub: "接続を確立する正しい手順を体験しよう",
     render: renderHandshakeStage,
     dialogue: [
@@ -813,6 +866,7 @@ const STAGES = [
   },
   {
     title: "ポート番号",
+    icon: "🚪",
     sub: "同じサーバーでもアプリごとに窓口が違う",
     render: renderPortStage,
     dialogue: [
@@ -830,6 +884,7 @@ const STAGES = [
   },
   {
     title: "パケットロス＆再送",
+    icon: "🔁",
     sub: "ロスを避けつつ、失敗しても再送で届ける",
     render: renderLossStage,
     dialogue: [
@@ -847,6 +902,7 @@ const STAGES = [
   },
   {
     title: "ファイアウォール",
+    icon: "🧱",
     sub: "ルールに従って通信を許可・拒否しよう",
     render: renderFirewallStage,
     dialogue: [
@@ -870,6 +926,8 @@ const STAGES = [
 document.getElementById("start-btn").onclick = () => {
   document.getElementById("start-modal").classList.add("hidden");
   state.score = 0;
+  state.maxReached = 0;
+  state.completed = new Set();
   addScore(0);
   startStage(0);
 };
@@ -877,6 +935,8 @@ document.getElementById("start-btn").onclick = () => {
 document.getElementById("restart-btn").onclick = () => {
   document.getElementById("end-modal").classList.add("hidden");
   state.score = 0;
+  state.maxReached = 0;
+  state.completed = new Set();
   addScore(0);
   startStage(0);
 };
