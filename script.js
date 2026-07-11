@@ -1466,8 +1466,8 @@ const STAGES = [
       { who: "cat", img: "cat", text: "ここまでのHTTP通信、実はそのままだと内容が丸見えなんだ。盗聴や改ざんを防ぐために使われるのが<strong>TLS</strong>だよ。HTTPにTLSを組み合わせたものが<strong>HTTPS</strong>なんだ。" },
       { who: "rabbit", img: "rabbit", text: "鍵をかけるってことですか？でも、鍵ってどうやって安全に渡すんですか……？渡す途中で盗み見られちゃいそうです。" },
       { who: "cat", img: "catThink", text: "鋭い！そこがTLSの工夫どころなんだ。最初に<strong>公開鍵暗号</strong>という仕組みを使って、盗み見られても安全な方法で「これから使う共通の鍵」を安全に受け渡すんだよ。" },
-      { who: "rabbit", img: "rabbitThink", text: "その最初のやり取りが<strong>TLSハンドシェイク</strong>なんですね。サーバーが本物かどうかもチェックするんですか？" },
-      { who: "cat", img: "cat", text: "そう、<strong>証明書</strong>を使ってサーバーの身元も確認するんだ。実際に手順を組み立てて体験してみよう。" }
+      { who: "rabbit", img: "rabbitThink", text: "なるほど、公開鍵を使って共通の鍵を安全に渡すんですね。ところで、サーバーが本物かどうかは、どうやって確認するんですか？" },
+      { who: "cat", img: "cat", text: "いいところに気づいたね。<strong>証明書</strong>を使ってサーバーの身元を確認するんだ。ここまでの一連のやり取りをまとめて<strong>TLSハンドシェイク</strong>と呼ぶよ。実際に手順を組み立てて体験してみよう。" }
     ],
     explainTitle: "TLSは「安全に鍵を渡す」仕組み",
     explainBody: `
