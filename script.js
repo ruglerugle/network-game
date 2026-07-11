@@ -143,6 +143,9 @@ function finishGame() {
     <ul class="explain-list">
       <li><b>OSI参照モデル</b>：通信を7つの階層（L1〜L7）に分けて役割分担する考え方</li>
       <li><b>DNS（L7）</b>：ドメイン名をIPアドレスに変換する「電話帳」の役割</li>
+      <li><b>HTTP（L7）</b>：リクエスト/レスポンスでやり取りするメソッドとステータスコード</li>
+      <li><b>TLS/HTTPS</b>：公開鍵暗号で共通鍵を安全に渡してから暗号化通信を行う仕組み</li>
+      <li><b>スイッチング・VLAN（L2）</b>：MACアドレステーブルでの転送と、論理的なネットワーク分割</li>
       <li><b>ルーティング（L3）</b>：宛先IPのサブネットを見て次の転送先を決める仕組み</li>
       <li><b>TCPハンドシェイク（L4）</b>：SYN → SYN/ACK → ACK で確立し、FIN/ACKのやり取りで終了</li>
       <li><b>ポート番号（L4）</b>：同じIPでもアプリごとに異なる「窓口」で通信を受け付ける</li>
@@ -435,7 +438,256 @@ function renderDnsStage(container, onComplete) {
 }
 
 /* =========================================================
-   ステージ3: ルーティング
+   ステージ3: HTTP通信の中身
+========================================================= */
+const HTTP_METHOD_POOL = ["GET", "POST", "PUT", "PATCH", "DELETE"];
+const HTTP_STATUS_POOL = [
+  "200 OK",
+  "301 Moved Permanently",
+  "400 Bad Request",
+  "401 Unauthorized",
+  "403 Forbidden",
+  "404 Not Found",
+  "500 Internal Server Error"
+];
+
+const HTTP_QUIZ = [
+  { clue: "サーバーからページの情報を取得したい（データは変更しない）", pool: HTTP_METHOD_POOL, correct: "GET" },
+  { clue: "フォームに入力した内容を送信し、新しいデータを作成したい", pool: HTTP_METHOD_POOL, correct: "POST" },
+  { clue: "既存のリソースの内容を丸ごと置き換えたい", pool: HTTP_METHOD_POOL, correct: "PUT" },
+  { clue: "既存のリソースを削除したい", pool: HTTP_METHOD_POOL, correct: "DELETE" },
+  { clue: "リクエストが成功し、正常にレスポンスを返せた", pool: HTTP_STATUS_POOL, correct: "200 OK" },
+  { clue: "リクエストされたページが見つからなかった", pool: HTTP_STATUS_POOL, correct: "404 Not Found" },
+  { clue: "ページが恒久的に別のURLへ移動した", pool: HTTP_STATUS_POOL, correct: "301 Moved Permanently" },
+  { clue: "ログインしていない、または認証情報が不足している", pool: HTTP_STATUS_POOL, correct: "401 Unauthorized" },
+  { clue: "サーバー側の内部エラーで処理できなかった", pool: HTTP_STATUS_POOL, correct: "500 Internal Server Error" }
+];
+
+function renderHttpStage(container, onComplete) {
+  let round = 0;
+
+  function renderRound() {
+    container.innerHTML = "";
+    const q = HTTP_QUIZ[round];
+    const isMethod = q.pool === HTTP_METHOD_POOL;
+    const distractors = shuffle(q.pool.filter((v) => v !== q.correct)).slice(0, 3);
+    const options = shuffle([q.correct, ...distractors]);
+
+    const panel = document.createElement("div");
+    panel.className = "panel";
+    panel.innerHTML = `
+      <p>${isMethod ? "この場面で使うべきHTTPメソッドは？" : "このステータスコードとして正しいのは？"}</p>
+      <div class="scenario-box">${q.clue}</div>
+      <div class="card-row" id="http-choices"></div>
+      <div class="feedback" id="http-feedback"></div>
+    `;
+    container.appendChild(panel);
+
+    const choicesEl = panel.querySelector("#http-choices");
+    const feedback = panel.querySelector("#http-feedback");
+    let answered = false;
+
+    options.forEach((opt) => {
+      const btn = document.createElement("button");
+      btn.type = "button";
+      btn.className = "choice-btn";
+      btn.textContent = opt;
+      btn.onclick = () => {
+        if (answered) return;
+        answered = true;
+        if (opt === q.correct) {
+          btn.classList.add("correct");
+          feedback.textContent = `正解！ ${q.correct} です。`;
+          feedback.className = "feedback ok";
+          addScore(10);
+        } else {
+          btn.classList.add("wrong");
+          feedback.textContent = `不正解。正しくは ${q.correct} でした。`;
+          feedback.className = "feedback ng";
+          [...choicesEl.children].forEach((c) => (c.disabled = true));
+          const correctBtn = [...choicesEl.children].find((c) => c.textContent === q.correct);
+          if (correctBtn) correctBtn.classList.add("correct");
+        }
+        appendNextButton(panel, advance);
+      };
+      choicesEl.appendChild(btn);
+    });
+  }
+
+  function advance() {
+    round++;
+    if (round >= HTTP_QUIZ.length) {
+      onComplete();
+    } else {
+      renderRound();
+    }
+  }
+
+  renderRound();
+}
+
+/* =========================================================
+   ステージ4: TLS/HTTPSの暗号化
+========================================================= */
+const TLS_SEQUENCE = [
+  { key: "CH", label: "ClientHello（対応する暗号方式・乱数を送る）", from: "client" },
+  { key: "SH", label: "ServerHello＋証明書（暗号方式の決定・サーバー証明書を送付）", from: "server" },
+  { key: "KEY", label: "鍵交換（共通鍵のもとになる情報を安全に交換）", from: "client" },
+  { key: "FIN", label: "Finished（以降の通信を共通鍵で暗号化して開始）", from: "server" }
+];
+const TLS_DISTRACTORS = [
+  { key: "SYN", label: "SYN（TCP接続要求）" },
+  { key: "PLAIN", label: "PLAINDATA（暗号化なしでデータ送信）" }
+];
+
+function renderTlsStage(container, onComplete) {
+  let step = 0;
+
+  container.innerHTML = `
+    <div class="panel">
+      <p>HTTPSは、TCP接続の上でさらに<b>TLSハンドシェイク</b>を行ってから暗号化通信を始めます。正しい順番でボタンを押してください。</p>
+      <div class="handshake-lane">
+        <div class="actor"><span class="icon">🖥️</span>クライアント</div>
+        <div class="timeline" id="tls-timeline"></div>
+        <div class="actor"><span class="icon">🗄️</span>サーバー</div>
+      </div>
+      <div class="option-pool" id="tls-pool"></div>
+      <div class="feedback" id="tls-feedback"></div>
+    </div>
+  `;
+
+  const timeline = container.querySelector("#tls-timeline");
+  const pool = container.querySelector("#tls-pool");
+  const feedback = container.querySelector("#tls-feedback");
+
+  const pooled = shuffle([...TLS_SEQUENCE, ...TLS_DISTRACTORS]);
+  pooled.forEach((item) => {
+    const btn = document.createElement("button");
+    btn.type = "button";
+    btn.className = "choice-btn";
+    btn.textContent = item.label;
+    btn.onclick = () => handleClick(item, btn);
+    pool.appendChild(btn);
+  });
+
+  function handleClick(item, btn) {
+    const expected = TLS_SEQUENCE[step];
+    if (item.key === expected.key) {
+      btn.remove();
+      const stepEl = document.createElement("div");
+      stepEl.className = `timeline-step from-${expected.from}`;
+      stepEl.textContent = `${step + 1}. ${expected.label}`;
+      timeline.appendChild(stepEl);
+      feedback.textContent = "正しい順番です！";
+      feedback.className = "feedback ok";
+      addScore(10);
+      step++;
+      if (step >= TLS_SEQUENCE.length) {
+        feedback.textContent = "TLSハンドシェイク完了！ここから先の通信は暗号化されます。";
+        pool.innerHTML = "";
+        appendNextButton(container.querySelector(".panel"), onComplete);
+      }
+    } else {
+      feedback.textContent = "順番が違います。鍵や証明書はどちらから先に必要か考えてみましょう。";
+      feedback.className = "feedback ng";
+    }
+  }
+}
+
+/* =========================================================
+   ステージ5: スイッチング・VLAN
+========================================================= */
+const VLAN_QUIZ = [
+  {
+    clue: "スイッチが受信したフレームの送信元MACアドレスを記録していく表",
+    correct: "MACアドレステーブル",
+    options: ["MACアドレステーブル", "ルーティングテーブル", "ARPテーブル", "DNSキャッシュ"]
+  },
+  {
+    clue: "宛先MACアドレスがMACアドレステーブルに見つからないとき、スイッチが取る動作",
+    correct: "フラッディング（学習済みポート以外の全ポートへ転送）",
+    options: ["フラッディング（学習済みポート以外の全ポートへ転送）", "そのフレームを破棄する", "デフォルトゲートウェイに転送する", "送信元にエラーを返す"]
+  },
+  {
+    clue: "1台の物理スイッチを、複数の独立した論理ネットワークに分割する技術",
+    correct: "VLAN（Virtual LAN）",
+    options: ["VLAN（Virtual LAN）", "NAT", "サブネッティング", "ポートフォワーディング"]
+  },
+  {
+    clue: "複数のVLANのフレームを、タグを付けて1本のケーブルでまとめて運ぶポート",
+    correct: "トランクポート（802.1Qタグ付き）",
+    options: ["トランクポート（802.1Qタグ付き）", "アクセスポート", "コンソールポート", "アップリンクポート（無条件）"]
+  },
+  {
+    clue: "同じVLAN（同じセグメント）内の1台がブロードキャストを送ると、届く範囲",
+    correct: "そのVLANに所属する全ての機器",
+    options: ["そのVLANに所属する全ての機器", "スイッチに接続された全機器（VLAN無視）", "送信元と直接リンクした1台のみ", "ルーターの先にある全ネットワーク"]
+  }
+];
+
+function renderVlanStage(container, onComplete) {
+  let round = 0;
+
+  function renderRound() {
+    container.innerHTML = "";
+    const q = VLAN_QUIZ[round];
+    const options = shuffle(q.options);
+
+    const panel = document.createElement("div");
+    panel.className = "panel";
+    panel.innerHTML = `
+      <p>次の内容に当てはまるのは？</p>
+      <div class="scenario-box">${q.clue}</div>
+      <div class="card-row" id="vlan-choices"></div>
+      <div class="feedback" id="vlan-feedback"></div>
+    `;
+    container.appendChild(panel);
+
+    const choicesEl = panel.querySelector("#vlan-choices");
+    const feedback = panel.querySelector("#vlan-feedback");
+    let answered = false;
+
+    options.forEach((opt) => {
+      const btn = document.createElement("button");
+      btn.type = "button";
+      btn.className = "choice-btn";
+      btn.textContent = opt;
+      btn.onclick = () => {
+        if (answered) return;
+        answered = true;
+        if (opt === q.correct) {
+          btn.classList.add("correct");
+          feedback.textContent = "正解！";
+          feedback.className = "feedback ok";
+          addScore(10);
+        } else {
+          btn.classList.add("wrong");
+          feedback.textContent = `不正解。正しくは「${q.correct}」でした。`;
+          feedback.className = "feedback ng";
+          [...choicesEl.children].forEach((c) => (c.disabled = true));
+          const correctBtn = [...choicesEl.children].find((c) => c.textContent === q.correct);
+          if (correctBtn) correctBtn.classList.add("correct");
+        }
+        appendNextButton(panel, advance);
+      };
+      choicesEl.appendChild(btn);
+    });
+  }
+
+  function advance() {
+    round++;
+    if (round >= VLAN_QUIZ.length) {
+      onComplete();
+    } else {
+      renderRound();
+    }
+  }
+
+  renderRound();
+}
+
+/* =========================================================
+   ステージ6: ルーティング
 ========================================================= */
 const ROUTING_ROUNDS = [
   {
@@ -1043,6 +1295,108 @@ const STAGES = [
       </table>
       <p>また、一度調べた結果は<b>キャッシュ</b>として一定時間（<b>TTL: Time To Live</b>）保存されるため、同じサイトに何度もアクセスしても毎回DNSサーバーに問い合わせる必要はありません。TTLが切れると、再度最新の情報を問い合わせ直します。</p>
       <p>セキュリティ面では、応答を偽造されて悪意あるサイトに誘導される<b>DNSキャッシュポイズニング</b>という攻撃が知られており、対策として応答にデジタル署名を付けて改ざんを検知する<b>DNSSEC</b>があります。また近年は、通信内容を暗号化して盗聴や改ざんを防ぐ<b>DoH（DNS over HTTPS）</b>や<b>DoT（DNS over TLS）</b>の利用も広がっています。</p>
+    `
+  },
+  {
+    title: "HTTP通信の中身",
+    icon: "📄",
+    layer: "L7 アプリケーション層",
+    sub: "リクエストとレスポンスの中身を理解しよう",
+    render: renderHttpStage,
+    dialogue: [
+      { who: "rabbit", img: "rabbit", text: "IPアドレスも分かって、接続もできるようになりました！あとはページの中身をもらうだけですよね？" },
+      { who: "cat", img: "cat", text: "そうだね。実際にWebページをやり取りするときに使われるのが<strong>HTTP</strong>だよ。クライアントが「リクエスト」を送って、サーバーが「レスポンス」を返す、というシンプルな仕組みなんだ。" },
+      { who: "rabbit", img: "rabbitThink", text: "リクエストにも種類があるんですか？" },
+      { who: "cat", img: "catThink", text: "うん。「取得したい」「送信したい」「削除したい」など、やりたいことによって<strong>HTTPメソッド</strong>を使い分けるんだ。そしてサーバーからの返事にも「成功」「エラー」などを表す<strong>ステータスコード</strong>が付いてくるよ。" },
+      { who: "rabbit", img: "rabbit", text: "普段何気なく見ている『404』とかも、そのステータスコードなんですね。やってみます！" }
+    ],
+    explainTitle: "HTTPは「リクエストとレスポンス」の会話",
+    explainBody: `
+      <p><b>HTTP（HyperText Transfer Protocol）</b>は、クライアントが<b>リクエスト</b>を送り、サーバーが<b>レスポンス</b>を返す、というシンプルな1往復のやり取りを基本とするプロトコルです。OSI参照モデルでは<b>L7 アプリケーション層</b>に属し、通常はTCPの80番（HTTP）または443番（HTTPS）を使います。</p>
+      <p>リクエストは、大きく3つの要素からなります。</p>
+      <ul class="explain-list">
+        <li><b>リクエストライン</b>：「GET /index.html HTTP/1.1」のように、メソッド・パス・バージョンを示す1行</li>
+        <li><b>ヘッダー</b>：Host（宛先ドメイン）、User-Agent（ブラウザの種類）、Cookie（セッション情報）など、付加情報のキーと値の一覧</li>
+        <li><b>ボディ</b>：POSTで送信するフォームの内容など、本体データ（GETでは通常空）</li>
+      </ul>
+      <p>代表的な<b>HTTPメソッド</b>は次のとおりです。</p>
+      <table class="rule-table">
+        <thead><tr><th>メソッド</th><th>用途</th></tr></thead>
+        <tbody>
+          <tr><td>GET</td><td>リソースの取得（データを変更しない）</td></tr>
+          <tr><td>POST</td><td>新しいリソースの作成、フォーム送信</td></tr>
+          <tr><td>PUT</td><td>リソースの内容を丸ごと置き換え</td></tr>
+          <tr><td>PATCH</td><td>リソースの一部だけを更新</td></tr>
+          <tr><td>DELETE</td><td>リソースの削除</td></tr>
+        </tbody>
+      </table>
+      <p><b>ステータスコード</b>は3桁の数字で、先頭の桁によっておおまかな意味が決まっています。</p>
+      <table class="rule-table">
+        <thead><tr><th>範囲</th><th>意味</th><th>代表例</th></tr></thead>
+        <tbody>
+          <tr><td>1xx</td><td>情報（処理継続中）</td><td>100 Continue</td></tr>
+          <tr><td>2xx</td><td>成功</td><td>200 OK</td></tr>
+          <tr><td>3xx</td><td>リダイレクト（転送）</td><td>301 Moved Permanently</td></tr>
+          <tr><td>4xx</td><td>クライアント側のエラー</td><td>400 Bad Request・401 Unauthorized・403 Forbidden・404 Not Found</td></tr>
+          <tr><td>5xx</td><td>サーバー側のエラー</td><td>500 Internal Server Error・503 Service Unavailable</td></tr>
+        </tbody>
+      </table>
+      <p>HTTPはそれ自体では「前回のやり取りを覚えていない」<b>ステートレス</b>なプロトコルです。ログイン状態などを維持するために、サーバーが発行した識別子をブラウザが<b>Cookie</b>として保存し、以後のリクエストに自動的に添付することで「継続したやり取り（セッション）」を実現しています。</p>
+      <p>バージョンによる違いもあります。<b>HTTP/1.1</b>は基本的に1つの接続で1つずつ順番にやり取りしますが、<b>HTTP/2</b>は1本のTCP接続上で複数のリクエストを並行して処理する<b>多重化</b>に対応し、<b>HTTP/3</b>はTCPの代わりに<b>QUIC（UDPベースの新しいトランスポート）</b>を使うことで、パケットロス時の影響をさらに減らし高速化しています。</p>
+    `
+  },
+  {
+    title: "TLS/HTTPSの暗号化",
+    icon: "🔒",
+    layer: "L6付近（TLS）",
+    sub: "通信を暗号化する手順を体験しよう",
+    render: renderTlsStage,
+    dialogue: [
+      { who: "cat", img: "cat", text: "ここまでのHTTP通信、実はそのままだと内容が丸見えなんだ。盗聴や改ざんを防ぐために使われるのが<strong>TLS</strong>だよ。HTTPにTLSを組み合わせたものが<strong>HTTPS</strong>なんだ。" },
+      { who: "rabbit", img: "rabbit", text: "鍵をかけるってことですか？でも、鍵ってどうやって安全に渡すんですか……？渡す途中で盗み見られちゃいそうです。" },
+      { who: "cat", img: "catThink", text: "鋭い！そこがTLSの工夫どころなんだ。最初に<strong>公開鍵暗号</strong>という仕組みを使って、盗み見られても安全な方法で「これから使う共通の鍵」を安全に受け渡すんだよ。" },
+      { who: "rabbit", img: "rabbitThink", text: "その最初のやり取りが<strong>TLSハンドシェイク</strong>なんですね。サーバーが本物かどうかもチェックするんですか？" },
+      { who: "cat", img: "cat", text: "そう、<strong>証明書</strong>を使ってサーバーの身元も確認するんだ。実際に手順を組み立てて体験してみよう。" }
+    ],
+    explainTitle: "TLSは「安全に鍵を渡す」仕組み",
+    explainBody: `
+      <p><b>TLS（Transport Layer Security）</b>は、通信の<b>暗号化</b>・<b>改ざん検知</b>・<b>相手の認証</b>を提供する仕組みです。OSI参照モデルの層に厳密には対応しませんが、慣習的にプレゼンテーション層（L6）やセッション層（L5）に近い働きをすると説明されることが多い機能です。HTTPにTLSを組み合わせたものが<b>HTTPS</b>で、TCPの443番ポートを使います。</p>
+      <p>暗号化の方式には大きく2種類あります。</p>
+      <ul class="explain-list">
+        <li><b>共通鍵暗号（対称鍵暗号）</b>：暗号化と復号に同じ鍵を使う方式。処理が高速だが、鍵そのものを安全に相手に渡す方法が課題になる</li>
+        <li><b>公開鍵暗号（非対称鍵暗号）</b>：暗号化用の「公開鍵」と復号用の「秘密鍵」がペアになっている方式。公開鍵は誰に知られてもよいが、処理が共通鍵より重い</li>
+      </ul>
+      <p>TLSはこの2つを組み合わせた<b>ハイブリッド方式</b>です。まず公開鍵暗号を使って、これから使う共通鍵のもとになる情報を安全に交換し、そのあとの実際のデータのやり取りは高速な共通鍵暗号で行います。</p>
+      <p>TLSハンドシェイクの主な流れは次のとおりです。</p>
+      <ol class="explain-list">
+        <li><b>ClientHello</b>：クライアントが対応する暗号方式の候補や乱数を送る</li>
+        <li><b>ServerHello＋証明書</b>：サーバーが使用する暗号方式を決定し、自分の身元を証明する<b>デジタル証明書</b>を送る</li>
+        <li><b>鍵交換</b>：証明書の検証後、共通鍵のもとになる情報を安全に交換する</li>
+        <li><b>Finished</b>：ここまでの内容に問題がなければ、以降の通信を共通鍵で暗号化して開始する</li>
+      </ol>
+      <p>サーバー証明書は、<b>認証局（CA: Certificate Authority）</b>と呼ばれる信頼できる第三者機関が発行・署名しており、ブラウザはこの署名を検証することで「本当にそのドメインの持ち主が発行したサーバーか」を確認します。証明書の有効期限が切れていたり、ドメインと証明書の情報が一致しなかったりすると、ブラウザは警告を表示します。また、1つのIPアドレスで複数のドメインのHTTPS証明書を使い分けるために、ハンドシェイクの最初にアクセス先のドメイン名を伝える<b>SNI（Server Name Indication）</b>という仕組みも使われています。</p>
+    `
+  },
+  {
+    title: "スイッチング・VLAN",
+    icon: "🔀",
+    layer: "L2 データリンク層",
+    sub: "同じネットワーク内の転送と、その分割方法を学ぼう",
+    render: renderVlanStage,
+    dialogue: [
+      { who: "rabbit", img: "rabbit", text: "IPアドレスで宛先が分かっても、同じ社内ネットワークの中では、最後どうやって相手のパソコンまで届けるんですか？" },
+      { who: "cat", img: "cat", text: "そこで活躍するのが<strong>スイッチ</strong>だよ。同じネットワーク内では、IPアドレスではなく<strong>MACアドレス</strong>という機器固有の番号を使って転送するんだ。" },
+      { who: "rabbit", img: "rabbitThink", text: "スイッチは、どの機器がどこにつながっているか、覚えているんですか？" },
+      { who: "cat", img: "catThink", text: "そう、<strong>MACアドレステーブル</strong>という表に学習していくんだ。もし宛先が分からなければ、とりあえず全部のポートに送ってみる<strong>フラッディング</strong>という動作をするよ。" },
+      { who: "rabbit", img: "rabbit", text: "1台のスイッチを部署ごとに分けたいときは、どうするんですか？" },
+      { who: "cat", img: "cat", text: "そこで使うのが<strong>VLAN</strong>だよ。物理的には同じスイッチでも、論理的に別のネットワークとして分割できるんだ。実際にクイズで確認してみよう。" }
+    ],
+    explainTitle: "スイッチは「MACアドレスの配達係」",
+    explainBody: `
+      <p>同じネットワーク（同一セグメント）内でデータを実際に届ける役割は、OSI参照モデルの<b>L2 データリンク層</b>が担当し、主に<b>スイッチ</b>という機器が働きます。ルーターがIPアドレスを見て別のネットワークへの経路を決めるのに対し、スイッチは<b>MACアドレス</b>（機器のネットワークインターフェースに割り当てられた固有の番号）を見て、同じネットワーク内での転送先ポートを決めます。</p>
+      <p>スイッチは、受信したフレームの<b>送信元MACアドレス</b>と、それがどのポートから届いたかを<b>MACアドレステーブル</b>に学習していきます。宛先MACアドレスがこの表に見つかれば、該当するポートだけにフレームを転送できます。まだ学習していない宛先の場合は、学習済みのポート以外の全ポートにフレームを送る<b>フラッディング</b>という動作を行い、応答が返ってきた際にその宛先を学習します。</p>
+      <p>用語の整理として、あるケーブル1本の区間で信号の衝突が起こりうる範囲を<b>コリジョンドメイン</b>、ブロードキャスト（宛先を全員にした通信）が届く範囲を<b>ブロードキャストドメイン</b>と呼びます。スイッチはポートごとにコリジョンドメインを分割しますが、ブロードキャストドメインは基本的に1つのままです。</p>
+      <p>このブロードキャストドメインを、物理的な配線を変えずに論理的に分割する技術が<b>VLAN（Virtual LAN）</b>です。例えば「営業部」「開発部」を同じスイッチにつなぎながら、VLANで分けることで、部署間の不要な通信を防ぎセキュリティを高めたり、ブロードキャストの影響範囲を狭めて無駄な通信を減らしたりできます。複数のVLANのフレームを1本のケーブルでスイッチ間にまとめて送りたい場合は、フレームに所属VLANを示すタグを付ける<b>802.1Q</b>という規格を使い、そのようなポートを<b>トランクポート</b>と呼びます（対して、特定の1つのVLANのみに属する通常のポートは<b>アクセスポート</b>と呼ばれます）。</p>
     `
   },
   {
