@@ -291,6 +291,9 @@ function matchesCidr(ip, cidr) {
 function renderDialogue(dialogue) {
   return dialogue
     .map((d) => {
+      if (d.type === "diagram") {
+        return `<div class="dialog-diagram">${d.html}</div>`;
+      }
       const isRabbit = d.who === "rabbit";
       return `<div class="dialog-row${isRabbit ? " right" : ""}">
         <div class="dialog-character">
@@ -1346,6 +1349,26 @@ const STAGES = [
       { who: "cat", img: "cat", text: "本編に入る前に、通信の全体像を押さえておこう。ネットワークの通信は、<strong>OSI参照モデル</strong>という7つの階層（レイヤー）に分けて考えるのが基本なんだ。" },
       { who: "rabbit", img: "rabbit", text: "7つも!? いきなり複雑そうです……。" },
       { who: "cat", img: "catThink", text: "難しく見えるけど、要は「役割ごとに仕事を分担している」だけなんだ。一番下が電気信号などの物理的なやり取り、一番上が私たちが使うアプリの通信、という積み木のような構造だよ。" },
+      { who: "rabbit", img: "rabbitThink", text: "積み木というと、データを送るときは実際どうなるんですか？" },
+      { who: "cat", img: "cat", text: "引っ越し荷物の梱包を思い浮かべてみて。中身（データ）を箱に入れて、その箱に部屋番号のラベル（トランスポート層）を貼り、さらに建物名のラベル（ネットワーク層）を貼り、最後に配送業者のラベル（データリンク層）を貼る……というふうに、外側に行くほどラベル（ヘッダー）が重なっていくんだ。これを<strong>カプセル化</strong>と呼ぶよ。" },
+      {
+        type: "diagram",
+        html: `
+          <div class="encap-stack">
+            <div class="encap-layer encap-l2">
+              <span class="encap-tag">Ethernetヘッダー（宛先MACアドレス）</span>
+              <div class="encap-layer encap-l3">
+                <span class="encap-tag">IPヘッダー（宛先IPアドレス）</span>
+                <div class="encap-layer encap-l4">
+                  <span class="encap-tag">TCPヘッダー（宛先ポート番号）</span>
+                  <div class="encap-layer encap-l7">データ（HTTPリクエストなど）</div>
+                </div>
+              </div>
+            </div>
+          </div>
+          <div class="flow-note">受信側では逆に、外側のラベルから順にはがしていく（非カプセル化）</div>
+        `
+      },
       { who: "rabbit", img: "rabbitThink", text: "この後の DNS やルーティング、TCP の話も、この階層のどこかに当てはまるんですね？" },
       { who: "cat", img: "cat", text: "その通り！各ステージのタイトル横に「第何層の話か」を表示していくから、今どこを学んでいるか意識しながら進めよう。" }
     ],
@@ -1416,8 +1439,23 @@ const STAGES = [
     render: renderHttpStage,
     dialogue: [
       { who: "rabbit", img: "rabbit", text: "IPアドレスも分かって、接続もできるようになりました！あとはページの中身をもらうだけですよね？" },
-      { who: "cat", img: "cat", text: "そうだね。実際にWebページをやり取りするときに使われるのが<strong>HTTP</strong>だよ。クライアントが「リクエスト」を送って、サーバーが「レスポンス」を返す、というシンプルな仕組みなんだ。" },
-      { who: "rabbit", img: "rabbitThink", text: "リクエストにも種類があるんですか？" },
+      { who: "cat", img: "cat", text: "そうだね。実際にWebページをやり取りするときに使われるのが<strong>HTTP</strong>だよ。クライアントが「リクエスト」を送って、サーバーが「レスポンス」を返す、というシンプルな仕組みなんだ。飲食店の注文みたいなものだよ。お客さんが「これをください」と注文（リクエスト）して、お店が料理（レスポンス）を返す。" },
+      {
+        type: "diagram",
+        html: `
+          <div class="flow-row">
+            <div class="node"><span class="node-icon">🖥️</span>クライアント</div>
+            <div class="flow-arrow"><span class="flow-label">GET /page.html</span><span class="flow-arrow-line">→</span></div>
+            <div class="node"><span class="node-icon">🗄️</span>サーバー</div>
+          </div>
+          <div class="flow-row">
+            <div class="node"><span class="node-icon">🖥️</span>クライアント</div>
+            <div class="flow-arrow"><span class="flow-label">200 OK ＋ HTML</span><span class="flow-arrow-line">←</span></div>
+            <div class="node"><span class="node-icon">🗄️</span>サーバー</div>
+          </div>
+        `
+      },
+      { who: "rabbit", img: "rabbitThink", text: "「注文（リクエスト）」にも種類があるんですか？" },
       { who: "cat", img: "catThink", text: "うん。「取得したい」「送信したい」「削除したい」など、やりたいことによって<strong>HTTPメソッド</strong>を使い分けるんだ。そしてサーバーからの返事にも「成功」「エラー」などを表す<strong>ステータスコード</strong>が付いてくるよ。" },
       { who: "rabbit", img: "rabbit", text: "普段何気なく見ている『404』とかも、そのステータスコードなんですね。やってみます！" }
     ],
@@ -1465,7 +1503,24 @@ const STAGES = [
     dialogue: [
       { who: "cat", img: "cat", text: "ここまでのHTTP通信、実はそのままだと内容が丸見えなんだ。盗聴や改ざんを防ぐために使われるのが<strong>TLS</strong>だよ。HTTPにTLSを組み合わせたものが<strong>HTTPS</strong>なんだ。" },
       { who: "rabbit", img: "rabbit", text: "鍵をかけるってことですか？でも、鍵ってどうやって安全に渡すんですか……？渡す途中で盗み見られちゃいそうです。" },
-      { who: "cat", img: "catThink", text: "鋭い！そこがTLSの工夫どころなんだ。最初に<strong>公開鍵暗号</strong>という仕組みを使って、盗み見られても安全な方法で「これから使う共通の鍵」を安全に受け渡すんだよ。" },
+      { who: "cat", img: "catThink", text: "鋭い！そこがTLSの工夫どころなんだ。<strong>公開鍵暗号</strong>は「誰でも閉められるけど、開けられるのは持ち主だけ」の南京錠のようなものだと思って。サーバーが配る南京錠（公開鍵）でクライアントが荷物を施錠して送れば、対応する鍵（秘密鍵）を持つサーバーしか開けられないんだ。" },
+      {
+        type: "diagram",
+        html: `
+          <div class="flow-row">
+            <div class="node"><span class="node-icon">🖥️</span>クライアント</div>
+            <div class="flow-arrow"><span class="flow-label">🔓 公開鍵（南京錠）を受け取る</span><span class="flow-arrow-line">←</span></div>
+            <div class="node"><span class="node-icon">🗄️</span>サーバー</div>
+          </div>
+          <div class="flow-row">
+            <div class="node"><span class="node-icon">🖥️</span>クライアント</div>
+            <div class="flow-arrow"><span class="flow-label">🔒 公開鍵で施錠して送る</span><span class="flow-arrow-line">→</span></div>
+            <div class="node"><span class="node-icon">🗄️</span>サーバー（秘密鍵で開錠）</div>
+          </div>
+          <div class="flow-note">以降は🔑共通鍵を使い、高速に暗号化通信を行う</div>
+        `
+      },
+      { who: "cat", img: "cat", text: "こうして「これから使う共通の鍵」を、途中で盗み見られても安全な方法で受け渡せるんだ。" },
       { who: "rabbit", img: "rabbitThink", text: "なるほど、公開鍵を使って共通の鍵を安全に渡すんですね。ところで、サーバーが本物かどうかは、どうやって確認するんですか？" },
       { who: "cat", img: "cat", text: "いいところに気づいたね。<strong>証明書</strong>を使ってサーバーの身元を確認するんだ。ここまでの一連のやり取りをまとめて<strong>TLSハンドシェイク</strong>と呼ぶよ。実際に手順を組み立てて体験してみよう。" }
     ],
@@ -1500,7 +1555,24 @@ const STAGES = [
       { who: "rabbit", img: "rabbitThink", text: "スイッチは、どの機器がどこにつながっているか、覚えているんですか？" },
       { who: "cat", img: "catThink", text: "そう、<strong>MACアドレステーブル</strong>という表に学習していくんだ。もし宛先が分からなければ、とりあえず全部のポートに送ってみる<strong>フラッディング</strong>という動作をするよ。" },
       { who: "rabbit", img: "rabbit", text: "1台のスイッチを部署ごとに分けたいときは、どうするんですか？" },
-      { who: "cat", img: "cat", text: "そこで使うのが<strong>VLAN</strong>だよ。物理的には同じスイッチでも、論理的に別のネットワークとして分割できるんだ。実際にクイズで確認してみよう。" }
+      { who: "cat", img: "cat", text: "そこで使うのが<strong>VLAN</strong>だよ。マンションを思い浮かべてみて。建物（スイッチ）は1つでも、部屋（VLAN）ごとに独立していて、隣の部屋の物音は基本聞こえないよね。VLANも同じで、物理的には同じスイッチでも、論理的に別のネットワークとして分割できるんだ。" },
+      {
+        type: "diagram",
+        html: `
+          <div class="vlan-switch">
+            <div class="vlan-title">1台のスイッチ（マンション）</div>
+            <div class="vlan-ports">
+              <div class="vlan-port vlan-a">Port1<br>VLAN10（営業部）</div>
+              <div class="vlan-port vlan-a">Port2<br>VLAN10（営業部）</div>
+              <div class="vlan-port vlan-b">Port3<br>VLAN20（開発部）</div>
+              <div class="vlan-port vlan-b">Port4<br>VLAN20（開発部）</div>
+            </div>
+          </div>
+          <div class="flow-note">VLAN10とVLAN20は、同じスイッチ上でも別ネットワークとして扱われる</div>
+        `
+      },
+      { who: "rabbit", img: "rabbitThink", text: "部屋（VLAN）が違うと、ブロードキャストみたいな「全員に届ける」通信も届かないんですね。" },
+      { who: "cat", img: "cat", text: "そういうこと！実際にクイズで確認してみよう。" }
     ],
     explainTitle: "スイッチは「MACアドレスの配達係」",
     explainBody: `
@@ -1638,7 +1710,15 @@ const STAGES = [
     dialogue: [
       { who: "cat", img: "cat", text: "ネットワークって実は完璧じゃないんだ。混雑や障害で、送ったデータの一部が<strong>途中で消えてしまう</strong>ことがある。これを<strong>パケットロス</strong>と呼ぶよ。" },
       { who: "rabbit", img: "rabbitThink", text: "えっ、データが消えちゃったら通信って失敗しちゃうじゃないですか！？" },
-      { who: "cat", img: "catThink", text: "普通ならそうなんだけど、TCPには保険がかかっているんだ。送ったデータへの確認応答（ACK）が一定時間内に返ってこないと、「届かなかった」と判断して自動的に<strong>再送</strong>してくれる。" },
+      { who: "cat", img: "catThink", text: "普通ならそうなんだけど、TCPには保険がかかっているんだ。書留郵便をイメージしてみて。相手に届くと「受け取りました」という控え（ACK）が返ってくる。もし一定時間内にその控えが返ってこなければ、「届かなかった」と判断して自動的に<strong>再送</strong>してくれるんだ。" },
+      {
+        type: "diagram",
+        html: `
+          <div class="seq-row"><span class="seq-step">① データを送信</span><span class="seq-arrow">→</span><span class="seq-status seq-lost">✕ 途中でロス</span></div>
+          <div class="seq-row"><span class="seq-step">② ACKが返ってこない</span><span class="seq-arrow">→</span><span class="seq-status seq-wait">⏱ タイムアウト検出</span></div>
+          <div class="seq-row"><span class="seq-step">③ 同じデータを再送</span><span class="seq-arrow">→</span><span class="seq-status seq-ok">✓ 今度は届いてACK</span></div>
+        `
+      },
       { who: "rabbit", img: "rabbit", text: "届くまで何度もリトライしてくれるから、多少ロスしても最終的にはちゃんと届くんですね。" },
       { who: "cat", img: "cat", text: "その通り！実際にロスを避けながら、届かなかったときは再送される様子を体験してみよう。" }
     ],
@@ -1663,6 +1743,20 @@ const STAGES = [
       { who: "cat", img: "cat", text: "いいところに気づいたね。実際のネットワークには、通信を選別する門番役の<strong>ファイアウォール</strong>がいるんだ。" },
       { who: "rabbit", img: "rabbitThink", text: "門番さんは、何を見て通す・通さないを決めるんですか？" },
       { who: "cat", img: "catThink", text: "主に<strong>プロトコルとポート番号</strong>だよ。「Webの通信（80/443）とDNS（53）だけ通す。それ以外は全部止める」みたいなルールを決めておくんだ。" },
+      {
+        type: "diagram",
+        html: `
+          <div class="flow-row">
+            <div class="node"><span class="node-icon">📦</span>通信</div>
+            <div class="flow-arrow"><span class="flow-arrow-line">→</span></div>
+            <div class="node"><span class="node-icon">🧱</span>ファイアウォール<br>（ルール判定）</div>
+          </div>
+          <div class="flow-note">
+            <span class="flow-outcome allow">✅ ルールに合致 → 許可</span>
+            <span class="flow-outcome deny">🚫 ルールに合致しない → 拒否</span>
+          </div>
+        `
+      },
       { who: "rabbit", img: "rabbit", text: "最後は自分がその門番になって判定してみればいいんですね！" }
     ],
     explainTitle: "ファイアウォールは門番",

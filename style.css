@@ -590,6 +590,52 @@ body::before {
   font-family: var(--f);
 }
 
+/* ---------- inline diagrams within dialogue ---------- */
+.dialog-diagram {
+  background: linear-gradient(180deg, #ffffff, #f8fbff);
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  padding: 14px 16px;
+  margin: 2px 0;
+  box-shadow: inset 0 1px 0 #fff, 0 2px 0 rgba(20, 45, 70, 0.04);
+}
+.flow-row { display: flex; align-items: center; justify-content: center; gap: 14px; margin-bottom: 10px; flex-wrap: wrap; }
+.flow-row:last-child { margin-bottom: 0; }
+.flow-arrow { display: flex; flex-direction: column; align-items: center; gap: 2px; min-width: 90px; }
+.flow-arrow-line { font-size: 1.3rem; color: var(--muted); }
+.flow-label { font-size: 0.72rem; color: var(--tac); font-weight: 800; text-align: center; }
+.flow-note { text-align: center; font-size: 0.8rem; color: var(--muted); font-weight: 700; margin-top: 8px; }
+.flow-outcome { display: inline-block; padding: 5px 12px; border-radius: 999px; font-size: 0.8rem; font-weight: 900; margin: 4px 6px; }
+.flow-outcome.allow { background: var(--ok); color: var(--tok); }
+.flow-outcome.deny { background: var(--ng); color: var(--tng); }
+
+/* encapsulation nested boxes (OSI) */
+.encap-stack { display: flex; flex-direction: column; align-items: center; }
+.encap-layer { border-radius: 10px; padding: 14px; text-align: center; width: 100%; max-width: 320px; }
+.encap-tag { display: block; font-size: 0.72rem; font-weight: 900; margin-bottom: 8px; }
+.encap-l2 { background: #eef2f7; border: 1.5px solid #b9c4d1; }
+.encap-l3 { background: var(--ac); border: 1.5px solid var(--bac); }
+.encap-l4 { background: #fff4df; border: 1.5px solid #e6b76a; }
+.encap-l7 { background: var(--ok); border: 1.5px solid var(--bok); padding: 10px; font-weight: 900; color: var(--tok); }
+
+/* VLAN switch diagram */
+.vlan-switch { text-align: center; }
+.vlan-title { font-size: 0.8rem; font-weight: 900; color: var(--muted); margin-bottom: 8px; }
+.vlan-ports { display: flex; flex-wrap: wrap; gap: 8px; justify-content: center; }
+.vlan-port { padding: 10px 14px; border-radius: 8px; font-size: 0.75rem; font-weight: 900; text-align: center; }
+.vlan-port.vlan-a { background: var(--ac); color: var(--tac); border: 1.5px solid var(--bac); }
+.vlan-port.vlan-b { background: #fbf0ff; color: #8a3fb0; border: 1.5px solid #d9a8f2; }
+
+/* sequence diagram (packet loss) */
+.seq-row { display: flex; align-items: center; gap: 10px; margin-bottom: 8px; font-size: 0.82rem; font-weight: 800; flex-wrap: wrap; }
+.seq-row:last-child { margin-bottom: 0; }
+.seq-step { flex-shrink: 0; color: var(--ink); }
+.seq-arrow { color: var(--muted); }
+.seq-status { padding: 3px 10px; border-radius: 999px; font-size: 0.75rem; }
+.seq-status.seq-lost { background: var(--ng); color: var(--tng); }
+.seq-status.seq-wait { background: #fff4df; color: #8a5a12; }
+.seq-status.seq-ok { background: var(--ok); color: var(--tok); }
+
 /* ---------- character dialogue (ねこ先生 / うさ美) ---------- */
 .dialog-scene {
   display: flex;
