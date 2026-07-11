@@ -78,6 +78,7 @@ function renderSideNav() {
 ========================================================= */
 const GLOSSARY = [
   { term: "OSI参照モデル", def: "通信を7つの階層に分けて役割分担する考え方。" },
+  { term: "PDU", def: "各階層でやり取りされるデータのまとまりを指す一般的な呼び方（Protocol Data Unit）。層によってビット・フレーム・パケット・セグメント・データと名前が変わる。" },
   { term: "カプセル化", def: "上位層から下位層に渡る際、各層が自分の役割に必要なヘッダーを付け足していく処理。" },
   { term: "キャッシュDNSサーバー", def: "クライアントの代わりに再帰的に問い合わせを行い、結果を一定時間保存するDNSサーバー。" },
   { term: "権威DNSサーバー", def: "そのドメインの正式な情報（IPアドレス等）を管理しているDNSサーバー。" },
@@ -353,7 +354,7 @@ function buildOsiDiagram() {
 function renderOsiStage(container, onComplete) {
   const diagramPanel = document.createElement("div");
   diagramPanel.className = "panel";
-  diagramPanel.innerHTML = `<p>まずは全体像を確認しよう。通信は<b>7つの階層（レイヤー）</b>に分かれていて、上の層ほど人間に近く、下の層ほど物理的な信号に近い。</p>${buildOsiDiagram()}`;
+  diagramPanel.innerHTML = glossify(`<p>まずは全体像を確認しよう。通信は<b>7つの階層（レイヤー）</b>に分かれていて、上の層ほど人間に近く、下の層ほど物理的な信号に近い。</p>${buildOsiDiagram()}`);
   container.appendChild(diagramPanel);
 
   const quizHost = document.createElement("div");
