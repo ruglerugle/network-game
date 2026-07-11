@@ -144,7 +144,7 @@ function finishGame() {
       <li><b>OSI参照モデル</b>：通信を7つの階層（L1〜L7）に分けて役割分担する考え方</li>
       <li><b>DNS（L7）</b>：ドメイン名をIPアドレスに変換する「電話帳」の役割</li>
       <li><b>ルーティング（L3）</b>：宛先IPのサブネットを見て次の転送先を決める仕組み</li>
-      <li><b>TCP 3ウェイハンドシェイク（L4）</b>：SYN → SYN/ACK → ACK で接続を確立</li>
+      <li><b>TCPハンドシェイク（L4）</b>：SYN → SYN/ACK → ACK で確立し、FIN/ACKのやり取りで終了</li>
       <li><b>ポート番号（L4）</b>：同じIPでもアプリごとに異なる「窓口」で通信を受け付ける</li>
       <li><b>パケットロス＆再送（L4）</b>：届かなかったデータはタイムアウト後に再送される</li>
       <li><b>ファイアウォール（L3〜L4）</b>：プロトコルとポート番号のルールで通信を許可／拒否する</li>
@@ -206,13 +206,13 @@ function appendNextButton(parent, onClick) {
    ステージ1: OSI参照モデル
 ========================================================= */
 const OSI_LAYERS = [
-  { num: 7, name: "アプリケーション層", example: "HTTP・DNS・メールなど、アプリが使う通信規約" },
-  { num: 6, name: "プレゼンテーション層", example: "文字コードの変換、暗号化・圧縮の形式を揃える" },
-  { num: 5, name: "セッション層", example: "通信の開始から終了までのやり取り（セッション）を管理" },
-  { num: 4, name: "トランスポート層", example: "TCP/UDP、ポート番号で通信の信頼性・区別を担当" },
-  { num: 3, name: "ネットワーク層", example: "IPアドレスを見て、ルーターが宛先までの転送経路を決める" },
-  { num: 2, name: "データリンク層", example: "MACアドレスを使い、同じネットワーク内でデータを届ける" },
-  { num: 1, name: "物理層", example: "LANケーブルの電気信号やWi-Fiの電波そのもの" }
+  { num: 7, name: "アプリケーション層", pdu: "データ", example: "HTTP・DNS・SMTP・FTPなど、アプリが使う通信規約" },
+  { num: 6, name: "プレゼンテーション層", pdu: "データ", example: "文字コードの変換、暗号化・圧縮の形式を揃える" },
+  { num: 5, name: "セッション層", pdu: "データ", example: "通信の開始から終了までのやり取り（セッション）を管理" },
+  { num: 4, name: "トランスポート層", pdu: "セグメント/データグラム", example: "TCP・UDP、ポート番号で通信の信頼性・区別を担当" },
+  { num: 3, name: "ネットワーク層", pdu: "パケット", example: "IPアドレス・ICMP・ルーティングで宛先までの経路を決める" },
+  { num: 2, name: "データリンク層", pdu: "フレーム", example: "MACアドレス・Ethernet・ARPで同一ネットワーク内に届ける" },
+  { num: 1, name: "物理層", pdu: "ビット", example: "LANケーブルの電気信号やWi-Fiの電波そのもの" }
 ];
 
 const OSI_QUIZ = [
@@ -230,7 +230,7 @@ function buildOsiDiagram() {
     <div class="osi-layer">
       <span class="osi-num">L${l.num}</span>
       <div class="osi-info">
-        <div class="osi-name">${l.name}</div>
+        <div class="osi-name">${l.name}<span class="osi-pdu">PDU: ${l.pdu}</span></div>
         <div class="osi-example">${l.example}</div>
       </div>
     </div>`).join("");
@@ -525,81 +525,138 @@ function renderRoutingStage(container, onComplete) {
 }
 
 /* =========================================================
-   ステージ4: TCP 3ウェイハンドシェイク
+   ステージ4: TCPハンドシェイク（確立・終了）
 ========================================================= */
+const HANDSHAKE_PHASES = [
+  {
+    title: "接続の確立（3ウェイハンドシェイク）",
+    instruction: "クライアントとサーバーが接続を確立するには、決まった順番でパケットをやり取りする必要があります（3ウェイハンドシェイク）。正しい順番でボタンを押してください。",
+    sequence: [
+      { key: "SYN", label: "SYN（接続要求）", from: "client" },
+      { key: "SYN-ACK", label: "SYN/ACK（要求の承認＋応答要求）", from: "server" },
+      { key: "ACK", label: "ACK（応答の確認・接続確立）", from: "client" }
+    ],
+    distractors: [
+      { key: "FIN", label: "FIN（切断要求）" },
+      { key: "DATA", label: "DATA（データ送信）" }
+    ],
+    doneText: "3ウェイハンドシェイク完了！接続が確立しました。"
+  },
+  {
+    title: "接続の終了（4ウェイハンドシェイク）",
+    instruction: "通信が終わったら、今度は接続を終了する手順を踏みます。TCPの切断は双方向で行うため、4回のやり取り（4ウェイハンドシェイク）になります。",
+    sequence: [
+      { key: "FIN1", label: "FIN（クライアントから切断要求）", from: "client" },
+      { key: "ACK1", label: "ACK（切断要求を確認・受信）", from: "server" },
+      { key: "FIN2", label: "FIN（サーバーからも切断要求）", from: "server" },
+      { key: "ACK2", label: "ACK（最終確認・接続終了）", from: "client" }
+    ],
+    distractors: [
+      { key: "SYN", label: "SYN（接続要求）" },
+      { key: "RST", label: "RST（強制的な切断）" }
+    ],
+    doneText: "4ウェイハンドシェイク完了！接続が正常に終了しました。"
+  }
+];
+
 function renderHandshakeStage(container, onComplete) {
-  const sequence = [
-    { key: "SYN", label: "SYN（接続要求）", from: "client" },
-    { key: "SYN-ACK", label: "SYN/ACK（要求の承認＋応答要求）", from: "server" },
-    { key: "ACK", label: "ACK（応答の確認・接続確立）", from: "client" }
-  ];
-  const distractors = [
-    { key: "FIN", label: "FIN（切断要求）" },
-    { key: "DATA", label: "DATA（データ送信）" }
-  ];
+  let phaseIndex = 0;
 
-  let step = 0;
+  function renderPhase() {
+    const phase = HANDSHAKE_PHASES[phaseIndex];
+    let step = 0;
 
-  container.innerHTML = `
-    <div class="panel">
-      <p>クライアントとサーバーが接続を確立するには、決まった順番でパケットをやり取りする必要があります（3ウェイハンドシェイク）。正しい順番でボタンを押してください。</p>
-      <div class="handshake-lane">
-        <div class="actor"><span class="icon">🖥️</span>クライアント</div>
-        <div class="timeline" id="hs-timeline"></div>
-        <div class="actor"><span class="icon">🗄️</span>サーバー</div>
+    container.innerHTML = `
+      <div class="panel">
+        <p><b>${phase.title}</b></p>
+        <p>${phase.instruction}</p>
+        <div class="handshake-lane">
+          <div class="actor"><span class="icon">🖥️</span>クライアント</div>
+          <div class="timeline" id="hs-timeline"></div>
+          <div class="actor"><span class="icon">🗄️</span>サーバー</div>
+        </div>
+        <div class="option-pool" id="hs-pool"></div>
+        <div class="feedback" id="hs-feedback"></div>
       </div>
-      <div class="option-pool" id="hs-pool"></div>
-      <div class="feedback" id="hs-feedback"></div>
-    </div>
-  `;
+    `;
 
-  const timeline = container.querySelector("#hs-timeline");
-  const pool = container.querySelector("#hs-pool");
-  const feedback = container.querySelector("#hs-feedback");
+    const timeline = container.querySelector("#hs-timeline");
+    const pool = container.querySelector("#hs-pool");
+    const feedback = container.querySelector("#hs-feedback");
 
-  const pooled = shuffle([...sequence, ...distractors]);
-  pooled.forEach((item) => {
-    const btn = document.createElement("button");
-    btn.type = "button";
-    btn.className = "choice-btn";
-    btn.textContent = item.label;
-    btn.onclick = () => handleClick(item, btn);
-    pool.appendChild(btn);
-  });
+    const pooled = shuffle([...phase.sequence, ...phase.distractors]);
+    pooled.forEach((item) => {
+      const btn = document.createElement("button");
+      btn.type = "button";
+      btn.className = "choice-btn";
+      btn.textContent = item.label;
+      btn.onclick = () => handleClick(item, btn);
+      pool.appendChild(btn);
+    });
 
-  function handleClick(item, btn) {
-    const expected = sequence[step];
-    if (item.key === expected.key) {
-      btn.remove();
-      const stepEl = document.createElement("div");
-      stepEl.className = `timeline-step from-${expected.from}`;
-      stepEl.textContent = `${step + 1}. ${expected.label}`;
-      timeline.appendChild(stepEl);
-      feedback.textContent = "正しい順番です！";
-      feedback.className = "feedback ok";
-      addScore(10);
-      step++;
-      if (step >= sequence.length) {
-        feedback.textContent = "3ウェイハンドシェイク完了！接続が確立しました。";
-        pool.innerHTML = "";
-        appendNextButton(container.querySelector(".panel"), onComplete);
+    function handleClick(item, btn) {
+      const expected = phase.sequence[step];
+      if (item.key === expected.key) {
+        btn.remove();
+        const stepEl = document.createElement("div");
+        stepEl.className = `timeline-step from-${expected.from}`;
+        stepEl.textContent = `${step + 1}. ${expected.label}`;
+        timeline.appendChild(stepEl);
+        feedback.textContent = "正しい順番です！";
+        feedback.className = "feedback ok";
+        addScore(10);
+        step++;
+        if (step >= phase.sequence.length) {
+          feedback.textContent = phase.doneText;
+          pool.innerHTML = "";
+          appendNextButton(container.querySelector(".panel"), advancePhase);
+        }
+      } else {
+        feedback.textContent = "順番が違います。今どちらが何を送るタイミングか考えてみましょう。";
+        feedback.className = "feedback ng";
       }
-    } else {
-      feedback.textContent = "順番が違います。今どちらが何を送るタイミングか考えてみましょう。";
-      feedback.className = "feedback ng";
     }
   }
+
+  function advancePhase() {
+    phaseIndex++;
+    if (phaseIndex >= HANDSHAKE_PHASES.length) {
+      onComplete();
+    } else {
+      renderPhase();
+    }
+  }
+
+  renderPhase();
 }
 
 /* =========================================================
    ステージ5: ポート番号
 ========================================================= */
+const PORT_POOL = {
+  20: "FTP(データ)",
+  21: "FTP(制御)",
+  22: "SSH",
+  23: "Telnet",
+  25: "SMTP",
+  53: "DNS",
+  67: "DHCP",
+  80: "HTTP",
+  110: "POP3",
+  143: "IMAP",
+  443: "HTTPS",
+  3389: "RDP"
+};
+
 const PORT_ROUNDS = [
-  { scenario: "暗号化されたWebサイト（HTTPS）を閲覧する", correct: 443, labels: { 80: "HTTP", 443: "HTTPS", 22: "SSH", 25: "SMTP", 53: "DNS" } },
-  { scenario: "暗号化なしのWebサイト（HTTP）を閲覧する", correct: 80, labels: { 80: "HTTP", 443: "HTTPS", 22: "SSH", 25: "SMTP", 53: "DNS" } },
-  { scenario: "メールサーバーへメールを送信する（SMTP）", correct: 25, labels: { 80: "HTTP", 443: "HTTPS", 22: "SSH", 25: "SMTP", 53: "DNS" } },
-  { scenario: "ドメイン名をIPアドレスに変換してもらう（DNS）", correct: 53, labels: { 80: "HTTP", 443: "HTTPS", 22: "SSH", 25: "SMTP", 53: "DNS" } },
-  { scenario: "リモートのサーバーに安全にログインする（SSH）", correct: 22, labels: { 80: "HTTP", 443: "HTTPS", 22: "SSH", 25: "SMTP", 53: "DNS" } }
+  { scenario: "暗号化されたWebサイト（HTTPS）を閲覧する", correct: 443 },
+  { scenario: "暗号化なしのWebサイト（HTTP）を閲覧する", correct: 80 },
+  { scenario: "メールサーバーへメールを送信する（SMTP）", correct: 25 },
+  { scenario: "ドメイン名をIPアドレスに変換してもらう（DNS）", correct: 53 },
+  { scenario: "リモートのサーバーに安全にログインする（SSH）", correct: 22 },
+  { scenario: "リモートデスクトップでWindowsサーバーに接続する（RDP）", correct: 3389 },
+  { scenario: "FTPサーバーに接続してファイルをやり取りする（制御用ポート）", correct: 21 },
+  { scenario: "メールサーバーに残したまま受信メールを確認する（IMAP）", correct: 143 }
 ];
 
 function renderPortStage(container, onComplete) {
@@ -608,7 +665,8 @@ function renderPortStage(container, onComplete) {
   function renderRound() {
     container.innerHTML = "";
     const r = PORT_ROUNDS[round];
-    const ports = shuffle(Object.keys(r.labels).map(Number));
+    const otherPorts = shuffle(Object.keys(PORT_POOL).map(Number).filter((p) => p !== r.correct)).slice(0, 4);
+    const ports = shuffle([r.correct, ...otherPorts]);
 
     const panel = document.createElement("div");
     panel.className = "panel";
@@ -627,18 +685,18 @@ function renderPortStage(container, onComplete) {
     ports.forEach((p) => {
       const door = document.createElement("div");
       door.className = "door";
-      door.innerHTML = `<span class="port-num">${p}</span><span class="port-label">${r.labels[p]}</span>`;
+      door.innerHTML = `<span class="port-num">${p}</span><span class="port-label">${PORT_POOL[p]}</span>`;
       door.onclick = () => {
         if (answered) return;
         answered = true;
         if (p === r.correct) {
           door.classList.add("correct");
-          feedback.textContent = `正解！ ポート${p}（${r.labels[p]}）宛てに届けられました。`;
+          feedback.textContent = `正解！ ポート${p}（${PORT_POOL[p]}）宛てに届けられました。`;
           feedback.className = "feedback ok";
           addScore(10);
         } else {
           door.classList.add("wrong");
-          feedback.textContent = `不正解。正しくはポート${r.correct}（${r.labels[r.correct]}）です。`;
+          feedback.textContent = `不正解。正しくはポート${r.correct}（${PORT_POOL[r.correct]}）です。`;
           feedback.className = "feedback ng";
           [...doorsEl.children].forEach((d) => (d.style.pointerEvents = "none"));
           const correctDoor = [...doorsEl.children].find((d) => d.querySelector(".port-num").textContent == r.correct);
@@ -932,18 +990,19 @@ const STAGES = [
     explainBody: `
       <p>実際の通信は、役割の異なる<b>7つの階層</b>に分けて考えることができます。これを<b>OSI参照モデル</b>と呼びます。上位層は下位層の機能を利用しながら、それぞれ決められた役割だけに集中することで、複雑な通信の仕組み全体を整理しています。</p>
       <table class="rule-table">
-        <thead><tr><th>層</th><th>名称</th><th>役割の例</th></tr></thead>
+        <thead><tr><th>層</th><th>名称</th><th>PDU</th><th>代表的なプロトコル・要素</th></tr></thead>
         <tbody>
-          <tr><td>L7</td><td>アプリケーション層</td><td>HTTP・DNS・メールなど、アプリの通信規約</td></tr>
-          <tr><td>L6</td><td>プレゼンテーション層</td><td>文字コード変換、暗号化・圧縮の形式を揃える</td></tr>
-          <tr><td>L5</td><td>セッション層</td><td>通信の開始〜終了までのやり取りを管理</td></tr>
-          <tr><td>L4</td><td>トランスポート層</td><td>TCP/UDP、ポート番号、通信の信頼性</td></tr>
-          <tr><td>L3</td><td>ネットワーク層</td><td>IPアドレス、ルーティング</td></tr>
-          <tr><td>L2</td><td>データリンク層</td><td>MACアドレス、同一ネットワーク内の転送</td></tr>
-          <tr><td>L1</td><td>物理層</td><td>ケーブルの電気信号・Wi-Fiの電波</td></tr>
+          <tr><td>L7</td><td>アプリケーション層</td><td>データ</td><td>HTTP/HTTPS・DNS・SMTP・FTP・SSH</td></tr>
+          <tr><td>L6</td><td>プレゼンテーション層</td><td>データ</td><td>文字コード（UTF-8等）、TLS/SSLの暗号化、圧縮</td></tr>
+          <tr><td>L5</td><td>セッション層</td><td>データ</td><td>セッション確立・維持・終了（TLSハンドシェイクの一部等）</td></tr>
+          <tr><td>L4</td><td>トランスポート層</td><td>セグメント/データグラム</td><td>TCP・UDP、ポート番号</td></tr>
+          <tr><td>L3</td><td>ネットワーク層</td><td>パケット</td><td>IP（IPv4/IPv6）・ICMP・ルーティング</td></tr>
+          <tr><td>L2</td><td>データリンク層</td><td>フレーム</td><td>Ethernet・Wi-Fi（802.11）・MACアドレス・ARP・スイッチ</td></tr>
+          <tr><td>L1</td><td>物理層</td><td>ビット</td><td>LANケーブル・光ファイバー・電波、リピーター・ハブ</td></tr>
         </tbody>
       </table>
-      <p>実務では、これをさらに簡略化した<b>TCP/IPモデル（4階層：アプリケーション層／トランスポート層／インターネット層／ネットワークインターフェース層）</b>もよく使われます。呼び方が違っても、考え方は同じです。この後のステージでも、それぞれの内容がOSIの何層に対応するかを見出しの横に表示していきます。</p>
+      <p>データを送信するとき、上位層から下位層に渡るたびに、各層が自分の役割に必要な<b>ヘッダー情報</b>を付け足していきます。この処理を<b>カプセル化（Encapsulation）</b>と呼びます。例えば「アプリのデータ」に<b>TCPヘッダー</b>（ポート番号など）が付くと<b>セグメント</b>、そこに<b>IPヘッダー</b>（IPアドレスなど）が付くと<b>パケット</b>、さらに<b>イーサネットヘッダー</b>（MACアドレスなど）が付くと<b>フレーム</b>と呼ばれ、最終的に電気信号（ビット）として送出されます。受信側では逆に、下位層から順にヘッダーを取り除いていく<b>非カプセル化（Decapsulation）</b>が行われます。</p>
+      <p>実務では、これをさらに簡略化した<b>TCP/IPモデル（4階層）</b>もよく使われます。OSIのL7〜L5をまとめて「アプリケーション層」、L4を「トランスポート層」、L3を「インターネット層」、L2・L1をまとめて「ネットワークインターフェース層」と呼びます。呼び方が違っても、考え方は同じです。この後のステージでも、それぞれの内容がOSIの何層に対応するかを見出しの横に表示していきます。</p>
     `
   },
   {
@@ -961,10 +1020,29 @@ const STAGES = [
     ],
     explainTitle: "DNSは「電話帳」",
     explainBody: `
-      <p>私たちが普段入力する「www.example.com」のようなドメイン名は、コンピューターにとっては直接の宛先になりません。通信には<b>IPアドレス</b>が必要です。<b>DNS（Domain Name System）</b>は、ドメイン名を対応するIPアドレスに変換してくれる仕組みで、よく「インターネットの電話帳」と例えられます。OSI参照モデルでは、アプリケーションが使うプロトコルなので<b>L7 アプリケーション層</b>に分類されます。</p>
-      <p>実際には多くの場合、あなたのPCは直接ドメインの管理元（権威DNSサーバー）に聞きに行くのではなく、まず<b>キャッシュDNSサーバー（フルサービスリゾルバ）</b>に問い合わせます。そのサーバーが答えを知らなければ、<b>ルートサーバー→TLD（.comなどの）サーバー→権威サーバー</b>の順に階層をたどって最終的なIPアドレスを調べる「再帰的な問い合わせ」を代行してくれます。</p>
-      <p>DNSが返す情報にはいくつか種類（レコードタイプ）があり、代表的なものに、IPv4アドレスを表す<b>Aレコード</b>、IPv6アドレスを表す<b>AAAAレコード</b>、別の名前へのエイリアスを表す<b>CNAMEレコード</b>などがあります。</p>
+      <p>私たちが普段入力する「www.example.com」のようなドメイン名は、コンピューターにとっては直接の宛先になりません。通信には<b>IPアドレス</b>が必要です。<b>DNS（Domain Name System）</b>は、ドメイン名を対応するIPアドレスに変換してくれる仕組みで、よく「インターネットの電話帳」と例えられます。OSI参照モデルでは、アプリケーションが使うプロトコルなので<b>L7 アプリケーション層</b>に分類され、通常<b>UDP/TCPの53番ポート</b>を使います（小さな応答はUDP、ゾーン転送など大きなデータはTCP）。</p>
+      <p>DNSの問い合わせには2種類の方式があります。</p>
+      <ul class="explain-list">
+        <li><b>再帰問い合わせ（Recursive Query）</b>：クライアントがキャッシュDNSサーバーに「答えが出るまで代わりに調べてきて」と依頼する方式。一般的なPC・スマホからの問い合わせはこちらです。</li>
+        <li><b>反復問い合わせ（Iterative Query）</b>：キャッシュDNSサーバーが、ルートサーバーやTLDサーバーに「知っていれば教えて、知らなければ次に聞くべき場所を教えて」と順に尋ねていく方式。サーバー同士のやり取りはこちらです。</li>
+      </ul>
+      <p>実際には、あなたのPCは直接権威DNSサーバーに聞きに行くのではなく、まず<b>キャッシュDNSサーバー（フルサービスリゾルバ）</b>に再帰問い合わせをします。そのサーバーが答えを知らなければ、<b>ルートサーバー→TLD（.comなどの）サーバー→権威サーバー</b>の順に反復問い合わせをたどって最終的な答えを調べ、結果をクライアントに返します。</p>
+      <p>DNSが返す情報にはいくつかの<b>レコードタイプ</b>があります。</p>
+      <table class="rule-table">
+        <thead><tr><th>レコード</th><th>内容</th></tr></thead>
+        <tbody>
+          <tr><td>A</td><td>ドメイン名に対応する IPv4 アドレス</td></tr>
+          <tr><td>AAAA</td><td>ドメイン名に対応する IPv6 アドレス</td></tr>
+          <tr><td>CNAME</td><td>別のドメイン名への別名（エイリアス）</td></tr>
+          <tr><td>MX</td><td>そのドメイン宛てメールを受け取るメールサーバー</td></tr>
+          <tr><td>NS</td><td>そのドメインを管理する権威DNSサーバー</td></tr>
+          <tr><td>TXT</td><td>任意のテキスト情報（送信ドメイン認証SPFなどに利用）</td></tr>
+          <tr><td>PTR</td><td>IPアドレスからドメイン名を調べる逆引き用</td></tr>
+          <tr><td>SOA</td><td>ゾーンの管理情報（シリアル番号やTTLの既定値など）</td></tr>
+        </tbody>
+      </table>
       <p>また、一度調べた結果は<b>キャッシュ</b>として一定時間（<b>TTL: Time To Live</b>）保存されるため、同じサイトに何度もアクセスしても毎回DNSサーバーに問い合わせる必要はありません。TTLが切れると、再度最新の情報を問い合わせ直します。</p>
+      <p>セキュリティ面では、応答を偽造されて悪意あるサイトに誘導される<b>DNSキャッシュポイズニング</b>という攻撃が知られており、対策として応答にデジタル署名を付けて改ざんを検知する<b>DNSSEC</b>があります。また近年は、通信内容を暗号化して盗聴や改ざんを防ぐ<b>DoH（DNS over HTTPS）</b>や<b>DoT（DNS over TLS）</b>の利用も広がっています。</p>
     `
   },
   {
@@ -983,37 +1061,64 @@ const STAGES = [
     explainTitle: "ルーティング＝転送先の判断",
     explainBody: `
       <p>インターネット上のデータは、宛先まで一直線につながっているわけではなく、<b>ルーター</b>を何台も経由して届けられます。この「IPアドレスを見て転送経路を決める」処理は、OSI参照モデルの<b>L3 ネットワーク層</b>の仕事です。</p>
-      <p>データは実際には<b>パケット（IPパケット）</b>という小さな単位に分割されて送られます。パケットの先頭には「宛先IPアドレス」「送信元IPアドレス」などが書かれた<b>ヘッダー</b>が付いており、ルーターはこのヘッダーの宛先IPアドレスだけを見て、次にどこへ転送すべきかを判断します。</p>
+      <p>データは実際には<b>パケット（IPパケット）</b>という小さな単位に分割されて送られます。パケットの先頭には「宛先IPアドレス」「送信元IPアドレス」「TTL（生存時間）」などが書かれた<b>ヘッダー</b>が付いており、ルーターはこのヘッダーの宛先IPアドレスだけを見て、次にどこへ転送すべきかを判断します。<b>TTL</b>はパケットが経由できるルーターの最大数を制限するフィールドで、ルーターを1つ通過するごとに1減り、0になると破棄されます。これにより、経路の誤り等でパケットが永遠にループし続けることを防いでいます。</p>
       <p>各ルーターは「このIPアドレス範囲（サブネット）宛てなら次はこちら」という<b>ルーティングテーブル</b>を持っています。宛先が自分の知っている範囲になければ、<b>デフォルトゲートウェイ</b>（「分からなければとりあえずここへ」という転送先）に投げることで、最終的にどこかのルーターが正しい経路にたどり着けるようになっています。この判断の連鎖（ホップ）によって、パケットは最終的に正しいサーバーへ届きます。</p>
+      <p>ルーティングテーブルの作り方には大きく2種類あります。</p>
+      <ul class="explain-list">
+        <li><b>スタティックルーティング（静的）</b>：管理者が手動で経路を設定する方式。小規模で経路数が少ないネットワーク向き。</li>
+        <li><b>ダイナミックルーティング（動的）</b>：ルーター同士がルーティングプロトコルで経路情報を自動的に交換し合う方式。代表例として、組織内向けの<b>OSPF</b>、古くからある<b>RIP</b>、インターネット全体の経路交換に使われる<b>BGP</b>があります。</li>
+      </ul>
+      <p>また、宛先IPアドレスの範囲（サブネット）は<b>CIDR（Classless Inter-Domain Routing）表記</b>で表されます。「192.168.10.0/24」の「/24」は、先頭32ビット中24ビットがネットワーク部（サブネットを識別する部分）であることを意味し、残り8ビット（2の8乗＝256個、実際に割り当てられるホストはネットワークアドレスとブロードキャストアドレスを除いた254個）がそのサブネット内の機器（ホスト）を識別するために使えます。数字が大きいほど、そのサブネットの範囲は狭くなります。</p>
+      <p>なお、宛先IPアドレスが分かっても、同一ネットワーク内で実際にデータを届けるには相手の<b>MACアドレス（L2）</b>が必要です。この「IPアドレスからMACアドレスを調べる」処理を行うのが<b>ARP（Address Resolution Protocol）</b>です。また、自宅や社内LANでよく使われるプライベートIPアドレスをインターネット上のグローバルIPアドレスに変換する<b>NAT（Network Address Translation）</b>という仕組みも、多くのルーターが持っています。</p>
     `
   },
   {
-    title: "TCP 3ウェイハンドシェイク",
+    title: "TCPハンドシェイク",
     icon: "🤝",
     layer: "L4 トランスポート層",
-    sub: "接続を確立する正しい手順を体験しよう",
+    sub: "接続の確立と終了の正しい手順を体験しよう",
     render: renderHandshakeStage,
     dialogue: [
-      { who: "cat", img: "cat", text: "次は、通信を始める前の「あいさつ」の話だよ。TCPで通信するときは、いきなりデータを送らずに<strong>3ウェイハンドシェイク</strong>という手順を踏むんだ。" },
+      { who: "cat", img: "cat", text: "次は、通信を始める前の「あいさつ」と、終わるときの「お別れの挨拶」の話だよ。TCPで通信するときは、いきなりデータを送らずに<strong>3ウェイハンドシェイク</strong>という手順を踏むんだ。" },
       { who: "rabbit", img: "rabbit", text: "あいさつ……？いきなり話しかけちゃダメなんですか？" },
       { who: "cat", img: "catThink", text: "ダメというか非効率なんだ。相手が本当に応答できる状態か確認せずに送ると、届かなかったときに困るだろ？だから<strong>SYN→SYN/ACK→ACK</strong>の3回のやり取りで、お互いに「準備OK」を確認し合うんだよ。" },
-      { who: "rabbit", img: "rabbitThink", text: "電話で「もしもし」「はい、聞こえてます」「じゃあ話します」ってやるのと似てますね。" },
-      { who: "cat", img: "cat", text: "いい例えだね！その順番を、実際にボタンを押して組み立ててみよう。" }
+      { who: "rabbit", img: "rabbitThink", text: "電話で「もしもし」「はい、聞こえてます」「じゃあ話します」ってやるのと似てますね。終わるときも何かあるんですか？" },
+      { who: "cat", img: "cat", text: "いいところに気づいたね。終了時は双方から切断を伝え合う<strong>4ウェイハンドシェイク</strong>を行うんだ。まずは確立、次に終了の順番を、実際にボタンを押して組み立ててみよう。" }
     ],
-    explainTitle: "接続はいきなり始まらない",
+    explainTitle: "接続はいきなり始まらない、いきなり終わらない",
     explainBody: `
       <p>ポート番号やこのハンドシェイクの仕組みは、OSI参照モデルの<b>L4 トランスポート層</b>が担当します。この層には主に2つのプロトコルがあります。</p>
       <ul class="explain-list">
         <li><b>TCP（Transmission Control Protocol）</b>：接続を確立し、届いたかどうかを確認しながら送る「信頼性重視」のプロトコル。Web閲覧やファイル転送など、データが欠けると困る通信で使われます。</li>
         <li><b>UDP（User Datagram Protocol）</b>：接続確立や確認応答を省略し、とにかく速く送る「速度重視」のプロトコル。動画配信やオンラインゲームなど、多少の欠損より速さが大事な通信で使われます。</li>
       </ul>
+      <p>TCPのヘッダーには、通信の状態を制御するための<b>フラグ（コントロールビット）</b>があります。代表的なものは次のとおりです。</p>
+      <table class="rule-table">
+        <thead><tr><th>フラグ</th><th>意味</th></tr></thead>
+        <tbody>
+          <tr><td>SYN</td><td>接続の開始（同期）を要求する</td></tr>
+          <tr><td>ACK</td><td>受け取ったデータ・要求への確認応答</td></tr>
+          <tr><td>FIN</td><td>正常な手順での接続終了を要求する</td></tr>
+          <tr><td>RST</td><td>異常時などに接続を強制的に切断する</td></tr>
+          <tr><td>PSH</td><td>バッファに溜めず、すぐ上位層にデータを渡すよう指示</td></tr>
+          <tr><td>URG</td><td>緊急に処理すべきデータであることを示す</td></tr>
+        </tbody>
+      </table>
       <p>Webサイトを見るときなど、多くの通信はTCPを使いますが、データを送る前に必ず接続を確立する手順を踏みます。それが<b>3ウェイハンドシェイク</b>です。</p>
       <ol class="explain-list">
         <li>クライアントが <b>SYN</b>（接続要求。同時にランダムな初期シーケンス番号を伝える）を送る</li>
         <li>サーバーが <b>SYN/ACK</b>（要求の承認＋自分からも接続要求）を返す</li>
         <li>クライアントが <b>ACK</b>（応答の確認）を送り、接続が確立する</li>
       </ol>
-      <p>ここで交換される<b>シーケンス番号</b>は、その後のデータ送信で「どこまで届いたか」を管理するために使われ、次のステージで学ぶ再送の仕組みにもつながっています。この3回のやり取りによって、双方が「送受信の準備ができている」ことを確認してからデータ転送を始めます。</p>
+      <p>ここで交換される<b>シーケンス番号</b>は、その後のデータ送信で「どこまで届いたか」を管理するために使われ、次のステージで学ぶ再送の仕組みにもつながっています。</p>
+      <p>通信が終わるときは、逆に接続を閉じる手順を踏みます。TCPの接続は双方向（クライアント→サーバー、サーバー→クライアント）に独立しているため、それぞれを個別に終了させる必要があり、合計4回のやり取りになる<b>4ウェイハンドシェイク</b>が行われます。</p>
+      <ol class="explain-list">
+        <li>クライアントが <b>FIN</b>（切断要求）を送る</li>
+        <li>サーバーが <b>ACK</b>（切断要求の確認）を返す</li>
+        <li>サーバーも送信が終わったら <b>FIN</b>（切断要求）を送る</li>
+        <li>クライアントが <b>ACK</b>（最終確認）を送り、接続が終了する</li>
+      </ol>
+      <p>なお、接続を確立している間、TCPは自身が今どのような状態にあるかを管理しています。主な状態には、接続要求を待つ<b>LISTEN</b>、SYNを送って応答待ちの<b>SYN_SENT</b>、接続が確立している<b>ESTABLISHED</b>、相手からのFINを待つ<b>FIN_WAIT</b>、切断後に念のため一定時間待機する<b>TIME_WAIT</b>などがあります。</p>
     `
   },
   {
@@ -1039,6 +1144,24 @@ const STAGES = [
         <li><b>動的・プライベートポート（49152〜65535）</b>：クライアント側が通信のたびに一時的に使う番号</li>
       </ul>
       <p>例えばブラウザでHTTPS通信をするとき、サーバー側は443番で待ち受けていますが、クライアント側は動的ポートの中からランダムに選んだ番号を送信元ポートとして使います。この組み合わせにより、同じサーバーへの複数の通信も正しく区別できます。</p>
+      <p>代表的なウェルノウンポートをもう少し紹介します。</p>
+      <table class="rule-table">
+        <thead><tr><th>ポート</th><th>プロトコル</th><th>用途</th></tr></thead>
+        <tbody>
+          <tr><td>20 / 21</td><td>FTP</td><td>ファイル転送（データ用／制御用）</td></tr>
+          <tr><td>22</td><td>SSH</td><td>暗号化されたリモートログイン</td></tr>
+          <tr><td>23</td><td>Telnet</td><td>暗号化なしのリモートログイン（現在は非推奨）</td></tr>
+          <tr><td>25</td><td>SMTP</td><td>メールの送信</td></tr>
+          <tr><td>53</td><td>DNS</td><td>名前解決</td></tr>
+          <tr><td>67 / 68</td><td>DHCP</td><td>IPアドレスの自動割り当て</td></tr>
+          <tr><td>80</td><td>HTTP</td><td>暗号化なしのWeb通信</td></tr>
+          <tr><td>110</td><td>POP3</td><td>メールの受信（サーバーからダウンロード）</td></tr>
+          <tr><td>143</td><td>IMAP</td><td>メールの受信（サーバー上で管理）</td></tr>
+          <tr><td>443</td><td>HTTPS</td><td>暗号化されたWeb通信</td></tr>
+          <tr><td>3389</td><td>RDP</td><td>Windowsのリモートデスクトップ接続</td></tr>
+        </tbody>
+      </table>
+      <p>家庭や社内のルーターは通常<b>NAT（Network Address Translation）</b>によって、内部の複数の機器で1つのグローバルIPアドレスを共有しています。外部からサーバーへの通信を内部の特定機器・ポートへ振り分けたい場合は、<b>ポートフォワーディング（ポート開放）</b>という設定で「外部からこのポート宛ての通信は、内部のこの機器のこのポートへ転送する」というルールを追加します。</p>
     `
   },
   {
@@ -1059,6 +1182,9 @@ const STAGES = [
       <p>ネットワークでは、混雑や機器の障害によって一部のデータ（パケット）が失われる<b>パケットロス</b>が起こります。この「届いたことを保証する」信頼性の仕組みも、<b>L4 トランスポート層</b>のTCPが担当しています。</p>
       <p>TCPは送ったデータそれぞれに<b>シーケンス番号</b>を振り、受信側はどこまで受け取ったかを<b>ACK（確認応答）</b>として送り返します。送信側は、ACKが一定時間内（<b>タイムアウト</b>）に返ってこない場合、そのデータは失われたと判断して自動的に<b>再送</b>します。</p>
       <p>これにより、多少のロスが起きても最終的にはデータが正しく届く仕組みになっています（信頼性の高い通信）。一方で、動画配信などに使われる<b>UDP</b>にはこの再送の仕組みがなく、多少データが欠けても構わないので速度を優先する、という設計上のトレードオフになっています。</p>
+      <p>再送を待つ時間（<b>RTO: Retransmission Timeout</b>）は固定ではなく、実際に観測した通信の往復時間（<b>RTT: Round Trip Time</b>）をもとに動的に調整されます。RTTが短い（応答が速い）ネットワークではRTOも短く、逆に不安定なネットワークではRTOを長めに取ることで、無駄な再送を減らしています。</p>
+      <p>また、TCPは1つ送っては応答を待つ、という非効率なやり取りをしているわけではありません。受信側が一度に受け取れるデータ量を伝える<b>ウィンドウサイズ</b>の範囲内で、確認応答を待たずに複数のデータをまとめて送り出す<b>スライディングウィンドウ</b>という仕組みで効率化しています。</p>
+      <p>さらに、ネットワークの混雑状況に応じて送信量を調整する<b>輻輳制御（ふくそうせいぎょ）</b>も行われます。代表的な流れとして、通信開始直後は送信量を少しずつ倍増させていく<b>スロースタート</b>、ロスが検知されるまで緩やかに増やし続ける<b>輻輳回避</b>、ロスを検知したら送信量を大きく絞る、という制御が行われ、ネットワーク全体が過負荷にならないよう配慮されています。</p>
     `
   },
   {
@@ -1082,7 +1208,17 @@ const STAGES = [
         <li><b>パケットフィルタリング（ステートレス）</b>：1つ1つの通信を独立に見て、送信元/宛先IP・ポート番号だけでルール判定する、シンプルで高速な方式</li>
         <li><b>ステートフルインスペクション</b>：通信の状態（例えば「これはこちらから開始した通信への返信か」）を記憶しながら判定する、より賢い方式。現在主流の方式です</li>
       </ul>
-      <p>例えば「Webの通信（TCP 80/443）とDNS（UDP 53）だけ許可し、それ以外はすべて拒否する」といったルールを設定することで、不要な通信や不正アクセスの経路を減らし、ネットワークを安全に保ちます。なお、最近ではアプリケーション層（L7）の中身まで検査する<b>次世代ファイアウォール（NGFW）</b>も広く使われています。</p>
+      <p>例えば「Webの通信（TCP 80/443）とDNS（UDP 53）だけ許可し、それ以外はすべて拒否する」といったルールを設定することで、不要な通信や不正アクセスの経路を減らし、ネットワークを安全に保ちます。この許可・拒否のルール一覧は<b>ACL（Access Control List）</b>と呼ばれ、実際の機器では次のように上から順に評価されます。</p>
+      <table class="rule-table">
+        <thead><tr><th>順序</th><th>送信元</th><th>宛先ポート</th><th>動作</th></tr></thead>
+        <tbody>
+          <tr><td>1</td><td>any（すべて）</td><td>TCP 80, 443</td><td class="allow">許可</td></tr>
+          <tr><td>2</td><td>any（すべて）</td><td>UDP 53</td><td class="allow">許可</td></tr>
+          <tr><td>3</td><td>any（すべて）</td><td>すべて</td><td class="deny">拒否（暗黙のdeny）</td></tr>
+        </tbody>
+      </table>
+      <p>公開が必要なWebサーバーなどを、社内ネットワークからは隔離しつつインターネットにも直接晒さない緩衝地帯として、<b>DMZ（DeMilitarized Zone）</b>という区画を設けるのも一般的な設計です。万が一DMZ上のサーバーが侵害されても、社内ネットワークへの被害を最小限にとどめられます。</p>
+      <p>ファイアウォールと似た用語に<b>IDS/IPS</b>があります。ファイアウォールが主にIPアドレスやポート番号のルールで通す／止めるを判断するのに対し、<b>IDS（不正侵入検知システム）</b>は通信の中身を分析して不審な兆候を検知・通知し、<b>IPS（不正侵入防止システム）</b>はさらに検知した通信を自動的に遮断するところまで行います。近年は、ポート番号だけでなくアプリケーション層（L7）の中身まで検査し、IPS的な機能も統合した<b>次世代ファイアウォール（NGFW）</b>も広く使われています。</p>
     `
   }
 ];
