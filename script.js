@@ -104,7 +104,7 @@ function startStage(index) {
   const stage = STAGES[index];
   const header = document.createElement("div");
   header.className = "stage-header";
-  header.innerHTML = `<h2>ステージ${index + 1}: ${stage.title}</h2><p class="stage-sub">${stage.sub}</p>`;
+  header.innerHTML = `<h2>ステージ${index + 1}: ${stage.title}</h2>${stage.layer ? `<span class="layer-badge">${stage.layer}</span>` : ""}<p class="stage-sub">${stage.sub}</p>`;
   gameArea.appendChild(header);
 
   if (stage.dialogue) {
@@ -141,12 +141,13 @@ function finishGame() {
   document.getElementById("end-summary").innerHTML = `
     <div class="dialog-scene">${renderDialogue(CLEAR_DIALOGUE)}</div>
     <ul class="explain-list">
-      <li><b>DNS</b>：ドメイン名をIPアドレスに変換する「電話帳」の役割</li>
-      <li><b>ルーティング</b>：宛先IPのサブネットを見て次の転送先を決める仕組み</li>
-      <li><b>TCP 3ウェイハンドシェイク</b>：SYN → SYN/ACK → ACK で接続を確立</li>
-      <li><b>ポート番号</b>：同じIPでもアプリごとに異なる「窓口」で通信を受け付ける</li>
-      <li><b>パケットロス＆再送</b>：届かなかったデータはタイムアウト後に再送される</li>
-      <li><b>ファイアウォール</b>：プロトコルとポート番号のルールで通信を許可／拒否する</li>
+      <li><b>OSI参照モデル</b>：通信を7つの階層（L1〜L7）に分けて役割分担する考え方</li>
+      <li><b>DNS（L7）</b>：ドメイン名をIPアドレスに変換する「電話帳」の役割</li>
+      <li><b>ルーティング（L3）</b>：宛先IPのサブネットを見て次の転送先を決める仕組み</li>
+      <li><b>TCP 3ウェイハンドシェイク（L4）</b>：SYN → SYN/ACK → ACK で接続を確立</li>
+      <li><b>ポート番号（L4）</b>：同じIPでもアプリごとに異なる「窓口」で通信を受け付ける</li>
+      <li><b>パケットロス＆再送（L4）</b>：届かなかったデータはタイムアウト後に再送される</li>
+      <li><b>ファイアウォール（L3〜L4）</b>：プロトコルとポート番号のルールで通信を許可／拒否する</li>
     </ul>`;
   document.getElementById("end-modal").classList.remove("hidden");
 }
@@ -202,7 +203,113 @@ function appendNextButton(parent, onClick) {
 }
 
 /* =========================================================
-   ステージ1: DNS解決
+   ステージ1: OSI参照モデル
+========================================================= */
+const OSI_LAYERS = [
+  { num: 7, name: "アプリケーション層", example: "HTTP・DNS・メールなど、アプリが使う通信規約" },
+  { num: 6, name: "プレゼンテーション層", example: "文字コードの変換、暗号化・圧縮の形式を揃える" },
+  { num: 5, name: "セッション層", example: "通信の開始から終了までのやり取り（セッション）を管理" },
+  { num: 4, name: "トランスポート層", example: "TCP/UDP、ポート番号で通信の信頼性・区別を担当" },
+  { num: 3, name: "ネットワーク層", example: "IPアドレスを見て、ルーターが宛先までの転送経路を決める" },
+  { num: 2, name: "データリンク層", example: "MACアドレスを使い、同じネットワーク内でデータを届ける" },
+  { num: 1, name: "物理層", example: "LANケーブルの電気信号やWi-Fiの電波そのもの" }
+];
+
+const OSI_QUIZ = [
+  { clue: "Webブラウザが<b>HTTP</b>でページをリクエストする", correctNum: 7 },
+  { clue: "ルーターが<b>IPアドレス</b>を見て転送先を決める", correctNum: 3 },
+  { clue: "<b>TCP/UDPのポート番号</b>でどのアプリ宛てかを区別する", correctNum: 4 },
+  { clue: "LANケーブルや<b>Wi-Fiの電波信号</b>そのもの", correctNum: 1 },
+  { clue: "同じネットワーク内で<b>MACアドレス</b>宛てにデータを届ける", correctNum: 2 },
+  { clue: "送受信する文字コードや<b>暗号化・圧縮</b>の形式を揃える", correctNum: 6 },
+  { clue: "通信の開始から終了までの<b>セッション</b>を管理する", correctNum: 5 }
+];
+
+function buildOsiDiagram() {
+  const rows = OSI_LAYERS.map((l) => `
+    <div class="osi-layer">
+      <span class="osi-num">L${l.num}</span>
+      <div class="osi-info">
+        <div class="osi-name">${l.name}</div>
+        <div class="osi-example">${l.example}</div>
+      </div>
+    </div>`).join("");
+  return `<div class="osi-stack">${rows}</div>`;
+}
+
+function renderOsiStage(container, onComplete) {
+  const diagramPanel = document.createElement("div");
+  diagramPanel.className = "panel";
+  diagramPanel.innerHTML = `<p>まずは全体像を確認しよう。通信は<b>7つの階層（レイヤー）</b>に分かれていて、上の層ほど人間に近く、下の層ほど物理的な信号に近い。</p>${buildOsiDiagram()}`;
+  container.appendChild(diagramPanel);
+
+  const quizHost = document.createElement("div");
+  container.appendChild(quizHost);
+
+  let round = 0;
+
+  function renderRound() {
+    quizHost.innerHTML = "";
+    const q = OSI_QUIZ[round];
+    const correctLayer = OSI_LAYERS.find((l) => l.num === q.correctNum);
+    const distractors = shuffle(OSI_LAYERS.filter((l) => l.num !== q.correctNum)).slice(0, 3);
+    const options = shuffle([correctLayer, ...distractors]);
+
+    const panel = document.createElement("div");
+    panel.className = "panel";
+    panel.innerHTML = `
+      <p>次の内容は、どの層の役割？</p>
+      <div class="scenario-box">${q.clue}</div>
+      <div class="card-row" id="osi-choices"></div>
+      <div class="feedback" id="osi-feedback"></div>
+    `;
+    quizHost.appendChild(panel);
+
+    const choicesEl = panel.querySelector("#osi-choices");
+    const feedback = panel.querySelector("#osi-feedback");
+    let answered = false;
+
+    options.forEach((layer) => {
+      const btn = document.createElement("button");
+      btn.type = "button";
+      btn.className = "choice-btn";
+      btn.textContent = `L${layer.num} ${layer.name}`;
+      btn.onclick = () => {
+        if (answered) return;
+        answered = true;
+        if (layer.num === q.correctNum) {
+          btn.classList.add("correct");
+          feedback.textContent = `正解！ L${correctLayer.num} ${correctLayer.name}の役割です。`;
+          feedback.className = "feedback ok";
+          addScore(10);
+        } else {
+          btn.classList.add("wrong");
+          feedback.textContent = `不正解。正しくは L${correctLayer.num} ${correctLayer.name} でした。`;
+          feedback.className = "feedback ng";
+          [...choicesEl.children].forEach((c) => (c.disabled = true));
+          const correctBtn = [...choicesEl.children].find((c) => c.textContent.startsWith(`L${correctLayer.num}`));
+          if (correctBtn) correctBtn.classList.add("correct");
+        }
+        appendNextButton(panel, advance);
+      };
+      choicesEl.appendChild(btn);
+    });
+  }
+
+  function advance() {
+    round++;
+    if (round >= OSI_QUIZ.length) {
+      onComplete();
+    } else {
+      renderRound();
+    }
+  }
+
+  renderRound();
+}
+
+/* =========================================================
+   ステージ2: DNS解決
 ========================================================= */
 const DNS_ROUNDS = [
   { type: "lookup", domain: "www.example.com", ip: "93.184.216.34" },
@@ -328,7 +435,7 @@ function renderDnsStage(container, onComplete) {
 }
 
 /* =========================================================
-   ステージ2: ルーティング
+   ステージ3: ルーティング
 ========================================================= */
 const ROUTING_ROUNDS = [
   {
@@ -418,7 +525,7 @@ function renderRoutingStage(container, onComplete) {
 }
 
 /* =========================================================
-   ステージ3: TCP 3ウェイハンドシェイク
+   ステージ4: TCP 3ウェイハンドシェイク
 ========================================================= */
 function renderHandshakeStage(container, onComplete) {
   const sequence = [
@@ -485,7 +592,7 @@ function renderHandshakeStage(container, onComplete) {
 }
 
 /* =========================================================
-   ステージ4: ポート番号
+   ステージ5: ポート番号
 ========================================================= */
 const PORT_ROUNDS = [
   { scenario: "暗号化されたWebサイト（HTTPS）を閲覧する", correct: 443, labels: { 80: "HTTP", 443: "HTTPS", 22: "SSH", 25: "SMTP", 53: "DNS" } },
@@ -556,7 +663,7 @@ function renderPortStage(container, onComplete) {
 }
 
 /* =========================================================
-   ステージ5: パケットロス＆再送（キャンバスゲーム）
+   ステージ6: パケットロス＆再送（キャンバスゲーム）
 ========================================================= */
 function renderLossStage(container, onComplete) {
   container.innerHTML = `
@@ -701,7 +808,7 @@ function renderLossStage(container, onComplete) {
 }
 
 /* =========================================================
-   ステージ6: ファイアウォール
+   ステージ7: ファイアウォール
 ========================================================= */
 const ALLOW_RULES = [
   { proto: "TCP", port: 80 },
@@ -809,8 +916,40 @@ const CLEAR_DIALOGUE = [
 ========================================================= */
 const STAGES = [
   {
+    title: "OSI参照モデル",
+    icon: "🧅",
+    layer: "全7層",
+    sub: "通信を7つの階層に分けて理解しよう",
+    render: renderOsiStage,
+    dialogue: [
+      { who: "cat", img: "cat", text: "本編に入る前に、通信の全体像を押さえておこう。ネットワークの通信は、<strong>OSI参照モデル</strong>という7つの階層（レイヤー）に分けて考えるのが基本なんだ。" },
+      { who: "rabbit", img: "rabbit", text: "7つも!? いきなり複雑そうです……。" },
+      { who: "cat", img: "catThink", text: "難しく見えるけど、要は「役割ごとに仕事を分担している」だけなんだ。一番下が電気信号などの物理的なやり取り、一番上が私たちが使うアプリの通信、という積み木のような構造だよ。" },
+      { who: "rabbit", img: "rabbitThink", text: "この後の DNS やルーティング、TCP の話も、この階層のどこかに当てはまるんですね？" },
+      { who: "cat", img: "cat", text: "その通り！各ステージのタイトル横に「第何層の話か」を表示していくから、今どこを学んでいるか意識しながら進めよう。" }
+    ],
+    explainTitle: "OSI参照モデルは「階層分担」",
+    explainBody: `
+      <p>実際の通信は、役割の異なる<b>7つの階層</b>に分けて考えることができます。これを<b>OSI参照モデル</b>と呼びます。上位層は下位層の機能を利用しながら、それぞれ決められた役割だけに集中することで、複雑な通信の仕組み全体を整理しています。</p>
+      <table class="rule-table">
+        <thead><tr><th>層</th><th>名称</th><th>役割の例</th></tr></thead>
+        <tbody>
+          <tr><td>L7</td><td>アプリケーション層</td><td>HTTP・DNS・メールなど、アプリの通信規約</td></tr>
+          <tr><td>L6</td><td>プレゼンテーション層</td><td>文字コード変換、暗号化・圧縮の形式を揃える</td></tr>
+          <tr><td>L5</td><td>セッション層</td><td>通信の開始〜終了までのやり取りを管理</td></tr>
+          <tr><td>L4</td><td>トランスポート層</td><td>TCP/UDP、ポート番号、通信の信頼性</td></tr>
+          <tr><td>L3</td><td>ネットワーク層</td><td>IPアドレス、ルーティング</td></tr>
+          <tr><td>L2</td><td>データリンク層</td><td>MACアドレス、同一ネットワーク内の転送</td></tr>
+          <tr><td>L1</td><td>物理層</td><td>ケーブルの電気信号・Wi-Fiの電波</td></tr>
+        </tbody>
+      </table>
+      <p>実務では、これをさらに簡略化した<b>TCP/IPモデル（4階層：アプリケーション層／トランスポート層／インターネット層／ネットワークインターフェース層）</b>もよく使われます。呼び方が違っても、考え方は同じです。この後のステージでも、それぞれの内容がOSIの何層に対応するかを見出しの横に表示していきます。</p>
+    `
+  },
+  {
     title: "DNS解決",
     icon: "📖",
+    layer: "L7 アプリケーション層",
     sub: "ドメイン名からIPアドレスを調べよう",
     render: renderDnsStage,
     dialogue: [
@@ -822,14 +961,16 @@ const STAGES = [
     ],
     explainTitle: "DNSは「電話帳」",
     explainBody: `
-      <p>私たちが普段入力する「www.example.com」のようなドメイン名は、コンピューターにとっては直接の宛先になりません。通信には<b>IPアドレス</b>が必要です。</p>
-      <p><b>DNS（Domain Name System）</b>は、ドメイン名を対応するIPアドレスに変換してくれる仕組みで、よく「インターネットの電話帳」と例えられます。ブラウザは裏側で必ずこのDNS問い合わせを行ってから、実際の通信を開始しています。</p>
-      <p>また、一度調べた結果は<b>キャッシュ</b>として一定時間（TTL）保存されるため、同じサイトに何度もアクセスしても毎回DNSサーバーに問い合わせる必要はありません。</p>
+      <p>私たちが普段入力する「www.example.com」のようなドメイン名は、コンピューターにとっては直接の宛先になりません。通信には<b>IPアドレス</b>が必要です。<b>DNS（Domain Name System）</b>は、ドメイン名を対応するIPアドレスに変換してくれる仕組みで、よく「インターネットの電話帳」と例えられます。OSI参照モデルでは、アプリケーションが使うプロトコルなので<b>L7 アプリケーション層</b>に分類されます。</p>
+      <p>実際には多くの場合、あなたのPCは直接ドメインの管理元（権威DNSサーバー）に聞きに行くのではなく、まず<b>キャッシュDNSサーバー（フルサービスリゾルバ）</b>に問い合わせます。そのサーバーが答えを知らなければ、<b>ルートサーバー→TLD（.comなどの）サーバー→権威サーバー</b>の順に階層をたどって最終的なIPアドレスを調べる「再帰的な問い合わせ」を代行してくれます。</p>
+      <p>DNSが返す情報にはいくつか種類（レコードタイプ）があり、代表的なものに、IPv4アドレスを表す<b>Aレコード</b>、IPv6アドレスを表す<b>AAAAレコード</b>、別の名前へのエイリアスを表す<b>CNAMEレコード</b>などがあります。</p>
+      <p>また、一度調べた結果は<b>キャッシュ</b>として一定時間（<b>TTL: Time To Live</b>）保存されるため、同じサイトに何度もアクセスしても毎回DNSサーバーに問い合わせる必要はありません。TTLが切れると、再度最新の情報を問い合わせ直します。</p>
     `
   },
   {
     title: "ルーティング",
     icon: "📡",
+    layer: "L3 ネットワーク層",
     sub: "宛先IPに合わせて次のルーターへ転送しよう",
     render: renderRoutingStage,
     dialogue: [
@@ -841,13 +982,15 @@ const STAGES = [
     ],
     explainTitle: "ルーティング＝転送先の判断",
     explainBody: `
-      <p>インターネット上のデータは、宛先まで一直線につながっているわけではなく、<b>ルーター</b>を何台も経由して届けられます。</p>
-      <p>各ルーターは「このIPアドレス範囲（サブネット）宛てなら次はこちら」という<b>ルーティングテーブル</b>を持っており、宛先IPアドレスを見て次に転送すべき経路を判断します。この判断の連鎖によって、パケットは最終的に正しいサーバーへたどり着きます。</p>
+      <p>インターネット上のデータは、宛先まで一直線につながっているわけではなく、<b>ルーター</b>を何台も経由して届けられます。この「IPアドレスを見て転送経路を決める」処理は、OSI参照モデルの<b>L3 ネットワーク層</b>の仕事です。</p>
+      <p>データは実際には<b>パケット（IPパケット）</b>という小さな単位に分割されて送られます。パケットの先頭には「宛先IPアドレス」「送信元IPアドレス」などが書かれた<b>ヘッダー</b>が付いており、ルーターはこのヘッダーの宛先IPアドレスだけを見て、次にどこへ転送すべきかを判断します。</p>
+      <p>各ルーターは「このIPアドレス範囲（サブネット）宛てなら次はこちら」という<b>ルーティングテーブル</b>を持っています。宛先が自分の知っている範囲になければ、<b>デフォルトゲートウェイ</b>（「分からなければとりあえずここへ」という転送先）に投げることで、最終的にどこかのルーターが正しい経路にたどり着けるようになっています。この判断の連鎖（ホップ）によって、パケットは最終的に正しいサーバーへ届きます。</p>
     `
   },
   {
     title: "TCP 3ウェイハンドシェイク",
     icon: "🤝",
+    layer: "L4 トランスポート層",
     sub: "接続を確立する正しい手順を体験しよう",
     render: renderHandshakeStage,
     dialogue: [
@@ -859,18 +1002,24 @@ const STAGES = [
     ],
     explainTitle: "接続はいきなり始まらない",
     explainBody: `
-      <p>Webサイトを見るときなど、多くの通信は<b>TCP</b>というプロトコルを使いますが、データを送る前に必ず接続を確立する手順を踏みます。それが<b>3ウェイハンドシェイク</b>です。</p>
+      <p>ポート番号やこのハンドシェイクの仕組みは、OSI参照モデルの<b>L4 トランスポート層</b>が担当します。この層には主に2つのプロトコルがあります。</p>
+      <ul class="explain-list">
+        <li><b>TCP（Transmission Control Protocol）</b>：接続を確立し、届いたかどうかを確認しながら送る「信頼性重視」のプロトコル。Web閲覧やファイル転送など、データが欠けると困る通信で使われます。</li>
+        <li><b>UDP（User Datagram Protocol）</b>：接続確立や確認応答を省略し、とにかく速く送る「速度重視」のプロトコル。動画配信やオンラインゲームなど、多少の欠損より速さが大事な通信で使われます。</li>
+      </ul>
+      <p>Webサイトを見るときなど、多くの通信はTCPを使いますが、データを送る前に必ず接続を確立する手順を踏みます。それが<b>3ウェイハンドシェイク</b>です。</p>
       <ol class="explain-list">
-        <li>クライアントが <b>SYN</b>（接続要求）を送る</li>
-        <li>サーバーが <b>SYN/ACK</b>（要求の承認＋自分からも要求）を返す</li>
+        <li>クライアントが <b>SYN</b>（接続要求。同時にランダムな初期シーケンス番号を伝える）を送る</li>
+        <li>サーバーが <b>SYN/ACK</b>（要求の承認＋自分からも接続要求）を返す</li>
         <li>クライアントが <b>ACK</b>（応答の確認）を送り、接続が確立する</li>
       </ol>
-      <p>この3回のやり取りによって、双方が「送受信の準備ができている」ことを確認してからデータ転送を始めます。</p>
+      <p>ここで交換される<b>シーケンス番号</b>は、その後のデータ送信で「どこまで届いたか」を管理するために使われ、次のステージで学ぶ再送の仕組みにもつながっています。この3回のやり取りによって、双方が「送受信の準備ができている」ことを確認してからデータ転送を始めます。</p>
     `
   },
   {
     title: "ポート番号",
     icon: "🚪",
+    layer: "L4 トランスポート層",
     sub: "同じサーバーでもアプリごとに窓口が違う",
     render: renderPortStage,
     dialogue: [
@@ -882,13 +1031,20 @@ const STAGES = [
     ],
     explainTitle: "ポート番号＝アプリの窓口",
     explainBody: `
-      <p>1台のサーバーでも、Webサーバー・メールサーバー・DNSサーバーなど複数のサービスが同時に動いていることがあります。それらを区別するのが<b>ポート番号</b>です。</p>
-      <p>代表的なポート番号として、HTTPは<b>80</b>、HTTPSは<b>443</b>、SSHは<b>22</b>、SMTPは<b>25</b>、DNSは<b>53</b>が使われます。IPアドレスが「建物の住所」だとすると、ポート番号は「建物内のどの窓口・部屋か」に相当します。</p>
+      <p>1台のサーバーでも、Webサーバー・メールサーバー・DNSサーバーなど複数のサービスが同時に動いていることがあります。それらを区別するのが、<b>L4 トランスポート層</b>が扱う<b>ポート番号</b>です。「IPアドレス＋ポート番号」の組み合わせは<b>ソケット</b>と呼ばれ、通信の相手を一意に特定します。</p>
+      <p>ポート番号は0〜65535の範囲で、大きく3つに分類されます。</p>
+      <ul class="explain-list">
+        <li><b>ウェルノウンポート（0〜1023）</b>：HTTP(80)・HTTPS(443)・SSH(22)・SMTP(25)・DNS(53)など、用途があらかじめ決められた番号</li>
+        <li><b>登録済みポート（1024〜49151）</b>：特定のアプリやサービスが登録して使う番号</li>
+        <li><b>動的・プライベートポート（49152〜65535）</b>：クライアント側が通信のたびに一時的に使う番号</li>
+      </ul>
+      <p>例えばブラウザでHTTPS通信をするとき、サーバー側は443番で待ち受けていますが、クライアント側は動的ポートの中からランダムに選んだ番号を送信元ポートとして使います。この組み合わせにより、同じサーバーへの複数の通信も正しく区別できます。</p>
     `
   },
   {
     title: "パケットロス＆再送",
     icon: "🔁",
+    layer: "L4 トランスポート層",
     sub: "ロスを避けつつ、失敗しても再送で届ける",
     render: renderLossStage,
     dialogue: [
@@ -900,13 +1056,15 @@ const STAGES = [
     ],
     explainTitle: "届かなければ、もう一度送る",
     explainBody: `
-      <p>ネットワークでは、混雑や障害によって一部のデータ（パケット）が失われる<b>パケットロス</b>が起こります。</p>
-      <p><b>TCP</b>では、送信したデータに対する確認応答（ACK）が一定時間内に返ってこない場合、そのデータは失われたと判断して自動的に<b>再送</b>します。これにより、多少のロスが起きても最終的にはデータが正しく届く仕組みになっています（信頼性の高い通信）。</p>
+      <p>ネットワークでは、混雑や機器の障害によって一部のデータ（パケット）が失われる<b>パケットロス</b>が起こります。この「届いたことを保証する」信頼性の仕組みも、<b>L4 トランスポート層</b>のTCPが担当しています。</p>
+      <p>TCPは送ったデータそれぞれに<b>シーケンス番号</b>を振り、受信側はどこまで受け取ったかを<b>ACK（確認応答）</b>として送り返します。送信側は、ACKが一定時間内（<b>タイムアウト</b>）に返ってこない場合、そのデータは失われたと判断して自動的に<b>再送</b>します。</p>
+      <p>これにより、多少のロスが起きても最終的にはデータが正しく届く仕組みになっています（信頼性の高い通信）。一方で、動画配信などに使われる<b>UDP</b>にはこの再送の仕組みがなく、多少データが欠けても構わないので速度を優先する、という設計上のトレードオフになっています。</p>
     `
   },
   {
     title: "ファイアウォール",
     icon: "🧱",
+    layer: "L3〜L4 ネットワーク〜トランスポート層",
     sub: "ルールに従って通信を許可・拒否しよう",
     render: renderFirewallStage,
     dialogue: [
@@ -918,8 +1076,13 @@ const STAGES = [
     ],
     explainTitle: "ファイアウォールは門番",
     explainBody: `
-      <p><b>ファイアウォール</b>は、あらかじめ決められたルール（プロトコルやポート番号など）に基づいて、通信を通す（許可）か止める（拒否）かを判断する仕組みです。</p>
-      <p>例えば「Webの通信（TCP 80/443）とDNS（UDP 53）だけ許可し、それ以外はすべて拒否する」といったルールを設定することで、不要な通信や不正アクセスの経路を減らし、ネットワークを安全に保ちます。</p>
+      <p><b>ファイアウォール</b>は、あらかじめ決められたルールに基づいて通信を通す（許可）か止める（拒否）かを判断する仕組みです。ここまで学んだ<b>L3のIPアドレス</b>と<b>L4のポート番号・プロトコル</b>を組み合わせて判定するため、ネットワーク層〜トランスポート層にまたがる機能です。</p>
+      <p>ファイアウォールには大きく2つの方式があります。</p>
+      <ul class="explain-list">
+        <li><b>パケットフィルタリング（ステートレス）</b>：1つ1つの通信を独立に見て、送信元/宛先IP・ポート番号だけでルール判定する、シンプルで高速な方式</li>
+        <li><b>ステートフルインスペクション</b>：通信の状態（例えば「これはこちらから開始した通信への返信か」）を記憶しながら判定する、より賢い方式。現在主流の方式です</li>
+      </ul>
+      <p>例えば「Webの通信（TCP 80/443）とDNS（UDP 53）だけ許可し、それ以外はすべて拒否する」といったルールを設定することで、不要な通信や不正アクセスの経路を減らし、ネットワークを安全に保ちます。なお、最近ではアプリケーション層（L7）の中身まで検査する<b>次世代ファイアウォール（NGFW）</b>も広く使われています。</p>
     `
   }
 ];

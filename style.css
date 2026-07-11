@@ -248,6 +248,48 @@ body::before {
   font-weight: 700;
   margin: 0;
 }
+.layer-badge {
+  display: inline-block;
+  margin-left: 4px;
+  margin-bottom: 8px;
+  padding: 3px 10px;
+  border-radius: 999px;
+  background: var(--ac);
+  border: 1px solid var(--bac);
+  color: var(--tac);
+  font-size: 11px;
+  font-weight: 900;
+  letter-spacing: 0.02em;
+}
+
+/* ---------- OSI stack diagram ---------- */
+.osi-stack {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  margin-top: 14px;
+}
+.osi-layer {
+  display: grid;
+  grid-template-columns: 48px 1fr;
+  gap: 12px;
+  align-items: center;
+  background: #fff;
+  border: 1.5px solid var(--line);
+  border-radius: 8px;
+  padding: 8px 12px;
+}
+.osi-num {
+  font-weight: 950;
+  font-size: 0.95rem;
+  color: var(--fac);
+  background: var(--ac);
+  border-radius: 6px;
+  text-align: center;
+  padding: 4px 0;
+}
+.osi-name { font-weight: 900; font-size: 0.92rem; color: var(--ink); }
+.osi-example { font-size: 0.78rem; color: var(--muted); font-weight: 700; margin-top: 2px; }
 
 .panel {
   background: var(--paper2);
