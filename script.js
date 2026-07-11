@@ -18,6 +18,7 @@ const navToggleBtn = document.getElementById("nav-toggle-btn");
 const sideToggleBtn = document.getElementById("side-toggle-btn");
 const stepList = document.getElementById("step-list");
 const appEl = document.getElementById("app");
+const sideBackdrop = document.getElementById("side-backdrop");
 
 function addScore(points) {
   state.score += points;
@@ -36,6 +37,7 @@ function toggleSidebar() {
 }
 navToggleBtn.onclick = toggleSidebar;
 sideToggleBtn.onclick = toggleSidebar;
+sideBackdrop.onclick = toggleSidebar;
 
 backBtn.onclick = () => {
   if (state.stageIndex > 0) {
