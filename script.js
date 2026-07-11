@@ -15,7 +15,7 @@ const progressFill = document.getElementById("progress-fill");
 
 function addScore(points) {
   state.score += points;
-  scoreIndicator.textContent = `スコア: ${state.score}`;
+  scoreIndicator.textContent = state.score;
 }
 
 function updateHud() {
