@@ -99,6 +99,7 @@ function startStage(index) {
   state.maxReached = Math.max(state.maxReached, index);
   updateHud();
   renderSideNav();
+  window.scrollTo(0, 0);
   gameArea.innerHTML = "";
   const stage = STAGES[index];
   const header = document.createElement("div");
@@ -134,6 +135,7 @@ function finishGame() {
   state.stageIndex = STAGES.length;
   updateHud();
   renderSideNav();
+  window.scrollTo(0, 0);
   gameArea.innerHTML = "";
   document.getElementById("end-score").textContent = `最終スコア: ${state.score} 点`;
   document.getElementById("end-summary").innerHTML = `
