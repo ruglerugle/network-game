@@ -636,6 +636,37 @@ body::before {
 .seq-status.seq-wait { background: #fff4df; color: #8a5a12; }
 .seq-status.seq-ok { background: var(--ok); color: var(--tok); }
 
+/* ---------- maze map (final stage) ---------- */
+.maze-map {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  overflow-x: auto;
+  padding: 6px 2px 18px;
+  margin-bottom: 4px;
+}
+.maze-node {
+  flex-shrink: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+  min-width: 84px;
+  padding: 10px 8px;
+  border-radius: 10px;
+  border: 2px solid var(--line);
+  background: #fff;
+  text-align: center;
+}
+.maze-icon { font-size: 1.4rem; }
+.maze-label { font-size: 0.7rem; font-weight: 900; color: var(--muted); }
+.maze-node.done { border-color: var(--bok); background: var(--ok); }
+.maze-node.done .maze-label { color: var(--tok); }
+.maze-node.current { border-color: var(--gold); background: #fff8e1; outline: 2px solid var(--gold); outline-offset: -4px; }
+.maze-node.current .maze-label { color: #8a6d00; }
+.maze-node.locked { opacity: 0.5; }
+.maze-arrow { flex-shrink: 0; color: var(--muted); font-size: 1.1rem; }
+
 /* ---------- character dialogue (ねこ先生 / うさ美) ---------- */
 .dialog-scene {
   display: flex;

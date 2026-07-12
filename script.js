@@ -80,8 +80,14 @@ const GLOSSARY = [
   { term: "OSI参照モデル", def: "通信を7つの階層に分けて役割分担する考え方。" },
   { term: "PDU", def: "各階層でやり取りされるデータのまとまりを指す一般的な呼び方（Protocol Data Unit）。層によってビット・フレーム・パケット・セグメント・データと名前が変わる。" },
   { term: "カプセル化", def: "上位層から下位層に渡る際、各層が自分の役割に必要なヘッダーを付け足していく処理。" },
-  { term: "キャッシュDNSサーバー", def: "クライアントの代わりに再帰的に問い合わせを行い、結果を一定時間保存するDNSサーバー。" },
-  { term: "権威DNSサーバー", def: "そのドメインの正式な情報（IPアドレス等）を管理しているDNSサーバー。" },
+  { term: "キャッシュDNSサーバー", def: "クライアントの代わりに再帰的に問い合わせを行い、結果を一定時間保存するDNSサーバー。フルサービスリゾルバとも呼ぶ。" },
+  { term: "フルサービスリゾルバ", def: "キャッシュDNSサーバーの正式名称。クライアントに代わって、答えが出るまで再帰的に問い合わせを行う。" },
+  { term: "権威DNSサーバー", def: "特定のドメインについて、実際のレコードを管理・保持している「本人」にあたるDNSサーバー。" },
+  { term: "ルートサーバー", def: "DNS階層の頂点にあり、各TLD（.comなど）の担当サーバーの場所を案内するサーバー。世界に13系統ある。" },
+  { term: "TLDサーバー", def: "「.com」「.jp」など特定のTLD（トップレベルドメイン）を管理し、配下の権威DNSサーバーの場所を案内するサーバー。" },
+  { term: "エニーキャスト", def: "同じIPアドレスを持つサーバーを世界中に分散配置し、利用者から見て最も近い1台に自動的に振り分ける技術。" },
+  { term: "ICANN", def: "ドメイン名やIPアドレスなど、インターネット全体の識別子資源を調整する国際的な非営利組織。" },
+  { term: "IANA", def: "ICANNの傘下で、DNSルートゾーンやIPアドレスの割り当てを実務的に管理する機関。" },
   { term: "再帰問い合わせ", def: "答えが出るまでDNSサーバーに代わりに調べてきてもらう問い合わせ方式。" },
   { term: "反復問い合わせ", def: "知っていれば教えて、知らなければ次に聞くべき場所を教えて、と順にたどっていく問い合わせ方式。" },
   { term: "DNSキャッシュポイズニング", def: "DNSの応答を偽造し、悪意あるサイトへ誘導する攻撃。" },
@@ -1327,6 +1333,100 @@ function renderFirewallStage(container, onComplete) {
 }
 
 /* =========================================================
+   ステージ11: 配送ルート最終試験（迷路）
+========================================================= */
+const MAZE_PATH = [
+  { key: "dns", label: "DNS解決", icon: "📖" },
+  { key: "route", label: "ルーティング", icon: "📡" },
+  { key: "switch", label: "スイッチング", icon: "🔀" },
+  { key: "tcp", label: "TCPハンドシェイク", icon: "🤝" },
+  { key: "tls", label: "TLSハンドシェイク", icon: "🔒" },
+  { key: "http", label: "HTTPリクエスト送信", icon: "📄" },
+  { key: "fw", label: "ファイアウォール通過", icon: "🧱" }
+];
+
+function buildMazeMap(step) {
+  const nodes = [
+    { icon: "🖥️", label: "クライアント" },
+    ...MAZE_PATH,
+    { icon: "🗄️", label: "サーバー" }
+  ];
+  const cells = nodes
+    .map((n, i) => {
+      let status;
+      if (i === 0 || i <= step) status = "done";
+      else if (i === step + 1) status = "current";
+      else status = "locked";
+      return `<div class="maze-node ${status}"><span class="maze-icon">${n.icon}</span><span class="maze-label">${n.label}</span></div>`;
+    })
+    .join('<span class="maze-arrow">→</span>');
+  return `<div class="maze-map">${cells}</div>`;
+}
+
+function renderMazeStage(container, onComplete) {
+  let step = 0;
+  const lossAtStep = 1 + Math.floor(Math.random() * (MAZE_PATH.length - 2));
+
+  function renderStep() {
+    container.innerHTML = buildMazeMap(step);
+
+    if (step >= MAZE_PATH.length) {
+      const donePanel = document.createElement("div");
+      donePanel.className = "panel";
+      donePanel.innerHTML = `<div class="feedback ok">サーバーに到着！データがたどった道のりを、すべて自分で選び切ったね。</div>`;
+      container.appendChild(donePanel);
+      appendNextButton(donePanel, onComplete);
+      return;
+    }
+
+    const correct = MAZE_PATH[step];
+    const decoys = shuffle(MAZE_PATH.filter((_, idx) => idx !== step)).slice(0, 2);
+    const options = shuffle([correct, ...decoys]);
+
+    const panel = document.createElement("div");
+    panel.className = "panel";
+    panel.innerHTML = `
+      <p>次に進むべき道はどれ？（${step + 1} / ${MAZE_PATH.length}）</p>
+      <div class="card-row" id="maze-choices"></div>
+      <div class="feedback" id="maze-feedback"></div>
+    `;
+    container.appendChild(panel);
+
+    const choicesEl = panel.querySelector("#maze-choices");
+    const feedback = panel.querySelector("#maze-feedback");
+
+    options.forEach((opt) => {
+      const btn = document.createElement("button");
+      btn.type = "button";
+      btn.className = "choice-btn";
+      btn.textContent = `${opt.icon} ${opt.label}`;
+      btn.onclick = () => {
+        if (opt.key === correct.key) {
+          [...choicesEl.children].forEach((c) => (c.disabled = true));
+          btn.classList.add("correct");
+          const lossNote = step === lossAtStep ? "（この区間で🔁パケットロスが発生したけど、自動的に再送されたよ）" : "";
+          feedback.textContent = `正解！ ${lossNote}`;
+          feedback.className = "feedback ok";
+          addScore(10);
+          appendNextButton(panel, () => {
+            step++;
+            renderStep();
+          });
+        } else {
+          btn.classList.add("wrong");
+          btn.disabled = true;
+          feedback.textContent = "✕ 行き止まり！別の道を選んでみよう。";
+          feedback.className = "feedback ng";
+        }
+      };
+      choicesEl.appendChild(btn);
+    });
+  }
+
+  renderStep();
+}
+
+/* =========================================================
    キャラクター会話（ねこ先生 / うさ美）
 ========================================================= */
 const CLEAR_DIALOGUE = [
@@ -1401,6 +1501,23 @@ const STAGES = [
       { who: "cat", img: "cat", text: "ようこそ、パケット大冒険へ！まずは「ドメイン名からIPアドレスを調べる」ところから始めよう。" },
       { who: "rabbit", img: "rabbit", text: "ドメイン名……www.example.comみたいなやつですよね？でも、それがどうやってIPアドレスになるんですか？" },
       { who: "cat", img: "catThink", text: "いい質問！コンピューター同士は住所（IPアドレス）でしか通信できないんだ。だから「ドメイン名→IPアドレス」の対応表を持っている<strong>DNSサーバー</strong>に、まず聞きにいく必要があるんだよ。" },
+      { who: "rabbit", img: "rabbit", text: "そのDNSサーバーって、世界に1台だけあるんですか？" },
+      { who: "cat", img: "catThink", text: "ううん、実はいくつもの役割のサーバーがリレーして連携しているんだ。まず私たちの代わりに調べ物をしてくれるのが<strong>フルサービスリゾルバ</strong>（さっき言った「DNSサーバー」の正式名称だよ）。そこから<strong>ルートサーバー</strong>→<strong>TLDサーバー</strong>→<strong>権威DNSサーバー</strong>の順に「ここじゃないなら次はここ」とたどっていくんだ。" },
+      {
+        type: "diagram",
+        html: `
+          <div class="seq-row"><span class="seq-step">① クライアント → フルサービスリゾルバ</span><span class="seq-arrow">→</span><span class="seq-status seq-wait">「www.example.comのIPは？」</span></div>
+          <div class="seq-row"><span class="seq-step">② リゾルバ → ルートサーバー</span><span class="seq-arrow">→</span><span class="seq-status seq-wait">「.comの担当は？」</span></div>
+          <div class="seq-row"><span class="seq-step">③ ルートサーバー → リゾルバ</span><span class="seq-arrow">→</span><span class="seq-status seq-ok">「.comのTLDサーバーはここ」</span></div>
+          <div class="seq-row"><span class="seq-step">④ リゾルバ → TLDサーバー</span><span class="seq-arrow">→</span><span class="seq-status seq-wait">「example.comの担当は？」</span></div>
+          <div class="seq-row"><span class="seq-step">⑤ TLDサーバー → リゾルバ</span><span class="seq-arrow">→</span><span class="seq-status seq-ok">「example.comの権威サーバーはここ」</span></div>
+          <div class="seq-row"><span class="seq-step">⑥ リゾルバ → 権威DNSサーバー</span><span class="seq-arrow">→</span><span class="seq-status seq-wait">「www.example.comのIPは？」</span></div>
+          <div class="seq-row"><span class="seq-step">⑦ 権威DNSサーバー → リゾルバ</span><span class="seq-arrow">→</span><span class="seq-status seq-ok">「93.184.216.34だよ」</span></div>
+          <div class="seq-row"><span class="seq-step">⑧ リゾルバ → クライアント</span><span class="seq-arrow">→</span><span class="seq-status seq-ok">最終回答（＋結果をキャッシュに保存）</span></div>
+        `
+      },
+      { who: "rabbit", img: "rabbitThink", text: "ルートサーバーとかTLDサーバーって、誰が管理しているんですか？" },
+      { who: "cat", img: "cat", text: "<strong>ICANN</strong>という国際的な非営利組織が、世界のドメイン名やIPアドレスの割り当て全体を調整しているんだ。実務的な管理は、その傘下の<strong>IANA</strong>という機関が担当しているよ。" },
       { who: "rabbit", img: "rabbitThink", text: "普段パソコンで<strong>nslookup</strong>や<strong>dig</strong>というコマンドを打つと、それが見られるんですよね？" },
       { who: "cat", img: "cat", text: "そうそう！ブラウザも裏側で必ず同じことをしているんだ。このステージでは「問い合わせる」ボタンを押して、実際にDNSサーバーから答えが返ってくる様子を見てみよう。" }
     ],
@@ -1412,7 +1529,22 @@ const STAGES = [
         <li><b>再帰問い合わせ（Recursive Query）</b>：クライアントがキャッシュDNSサーバーに「答えが出るまで代わりに調べてきて」と依頼する方式。一般的なPC・スマホからの問い合わせはこちらです。</li>
         <li><b>反復問い合わせ（Iterative Query）</b>：キャッシュDNSサーバーが、ルートサーバーやTLDサーバーに「知っていれば教えて、知らなければ次に聞くべき場所を教えて」と順に尋ねていく方式。サーバー同士のやり取りはこちらです。</li>
       </ul>
-      <p>実際には、あなたのPCは直接権威DNSサーバーに聞きに行くのではなく、まず<b>キャッシュDNSサーバー（フルサービスリゾルバ）</b>に再帰問い合わせをします。そのサーバーが答えを知らなければ、<b>ルートサーバー→TLD（.comなどの）サーバー→権威サーバー</b>の順に反復問い合わせをたどって最終的な答えを調べ、結果をクライアントに返します。</p>
+      <p>実際には、あなたのPCは直接権威DNSサーバーに聞きに行くのではなく、まず<b>キャッシュDNSサーバー（正式には「フルサービスリゾルバ」または単に「フルリゾルバ」と呼びます）</b>に再帰問い合わせをします。プロバイダが用意しているものや、Google Public DNS（8.8.8.8）などの公開サービスがこれにあたります。フルサービスリゾルバは、答えを知らなければ次の3種類のサーバーに順番に反復問い合わせを行い、最終的な答えを調べて結果をクライアントに返します。</p>
+      <ul class="explain-list">
+        <li><b>ルートサーバー</b>：DNSの階層構造の頂点にあり、「.com」「.jp」などTLD（トップレベルドメイン）ごとの担当（TLDサーバー）がどこにあるかを案内します。世界に13系統（a〜m.root-servers.net）あり、実際にはそれぞれ<b>エニーキャスト</b>という技術で世界中に数百台規模で分散配置され、可用性を高めています。</li>
+        <li><b>TLDサーバー</b>：「.com」「.jp」など特定のTLDを管理し、そのTLD配下の各ドメイン（example.comなど）を管理する権威DNSサーバーの場所を案内します。</li>
+        <li><b>権威DNSサーバー</b>：特定のドメイン（example.comなど）について、実際のAレコードなどのレコードを管理・保持している、いわば「本人」にあたるサーバーです。</li>
+      </ul>
+      <p>実際の問い合わせの道順は、次のような流れになります（www.example.comを調べる例）。</p>
+      <div class="seq-row"><span class="seq-step">① クライアント → フルサービスリゾルバ</span><span class="seq-arrow">→</span><span class="seq-status seq-wait">「www.example.comのIPは？」</span></div>
+      <div class="seq-row"><span class="seq-step">② リゾルバ → ルートサーバー</span><span class="seq-arrow">→</span><span class="seq-status seq-wait">「.comの担当は？」</span></div>
+      <div class="seq-row"><span class="seq-step">③ ルートサーバー → リゾルバ</span><span class="seq-arrow">→</span><span class="seq-status seq-ok">「.comのTLDサーバーはここ」</span></div>
+      <div class="seq-row"><span class="seq-step">④ リゾルバ → TLDサーバー</span><span class="seq-arrow">→</span><span class="seq-status seq-wait">「example.comの担当は？」</span></div>
+      <div class="seq-row"><span class="seq-step">⑤ TLDサーバー → リゾルバ</span><span class="seq-arrow">→</span><span class="seq-status seq-ok">「example.comの権威サーバーはここ」</span></div>
+      <div class="seq-row"><span class="seq-step">⑥ リゾルバ → 権威DNSサーバー</span><span class="seq-arrow">→</span><span class="seq-status seq-wait">「www.example.comのIPは？」</span></div>
+      <div class="seq-row"><span class="seq-step">⑦ 権威DNSサーバー → リゾルバ</span><span class="seq-arrow">→</span><span class="seq-status seq-ok">「93.184.216.34だよ」</span></div>
+      <div class="seq-row"><span class="seq-step">⑧ リゾルバ → クライアント</span><span class="seq-arrow">→</span><span class="seq-status seq-ok">最終回答（＋結果をキャッシュに保存）</span></div>
+      <p>この階層全体の頂点（ルートゾーン）や、ドメイン名・IPアドレスといったインターネットの識別子資源は、<b>ICANN（Internet Corporation for Assigned Names and Numbers）</b>という国際的な非営利組織が調整しています。実務的なルートゾーンの管理やIPアドレスの割り当ては、その傘下にある<b>IANA（Internet Assigned Numbers Authority）</b>という機関が担っており、実際に「.jp」を管理するJPRSのような各TLDの登録管理団体（レジストリ）に運用が委任される仕組みになっています。</p>
       <p>DNSが返す情報にはいくつかの<b>レコードタイプ</b>があります。</p>
       <table class="rule-table">
         <thead><tr><th>レコード</th><th>内容</th></tr></thead>
@@ -1778,6 +1910,33 @@ const STAGES = [
       </table>
       <p>公開が必要なWebサーバーなどを、社内ネットワークからは隔離しつつインターネットにも直接晒さない緩衝地帯として、<b>DMZ（DeMilitarized Zone）</b>という区画を設けるのも一般的な設計です。万が一DMZ上のサーバーが侵害されても、社内ネットワークへの被害を最小限にとどめられます。</p>
       <p>ファイアウォールと似た用語に<b>IDS/IPS</b>があります。ファイアウォールが主にIPアドレスやポート番号のルールで通す／止めるを判断するのに対し、<b>IDS（不正侵入検知システム）</b>は通信の中身を分析して不審な兆候を検知・通知し、<b>IPS（不正侵入防止システム）</b>はさらに検知した通信を自動的に遮断するところまで行います。近年は、ポート番号だけでなくアプリケーション層（L7）の中身まで検査し、IPS的な機能も統合した<b>次世代ファイアウォール（NGFW）</b>も広く使われています。</p>
+    `
+  },
+  {
+    title: "配送ルート最終試験",
+    icon: "🧩",
+    layer: "総復習",
+    sub: "学んだ順番で、データが通る道をたどろう",
+    render: renderMazeStage,
+    dialogue: [
+      { who: "cat", img: "cat", text: "さあ、いよいよ最終試験だよ！ここまで学んだ知識を総動員して、データがクライアントからサーバーに届くまでの<strong>正しい道順</strong>を、迷路のようにたどってみよう。" },
+      { who: "rabbit", img: "rabbit", text: "分かれ道がいっぱいありそうで緊張します……順番、ちゃんと覚えてるかな。" },
+      { who: "cat", img: "catThink", text: "大丈夫、間違えても「行き止まり」に気づいたらすぐ引き返せるよ。DNSで住所を調べるところから始めて、最後はファイアウォールを通ってサーバーに到着するまで、正しい道を選んでいこう！" },
+      { who: "rabbit", img: "rabbitThink", text: "よーし、やってみます！" }
+    ],
+    explainTitle: "データが通った道のり",
+    explainBody: `
+      <p>お疲れさま！最終試験で選んだ道が、まさに1つのHTTPS通信がたどる実際の道のりです。</p>
+      <ol class="explain-list">
+        <li><b>DNS解決（L7）</b>：ドメイン名をIPアドレスに変換する</li>
+        <li><b>ルーティング（L3）</b>：ルーターを経由して宛先ネットワークまで転送経路を決める</li>
+        <li><b>スイッチング（L2）</b>：同じネットワーク内ではMACアドレスで転送する</li>
+        <li><b>TCPハンドシェイク（L4）</b>：3ウェイハンドシェイクで接続を確立する</li>
+        <li><b>TLSハンドシェイク</b>：公開鍵で共通鍵を安全に渡し、暗号化通信を始める</li>
+        <li><b>HTTPリクエスト送信（L7）</b>：正しいポート番号宛てにリクエストを送る</li>
+        <li><b>ファイアウォール通過</b>：ルールに合致した通信だけが最終的にサーバーへ届く</li>
+      </ol>
+      <p>途中でパケットロスが起きても、TCPが自動的に再送してくれるおかげで、最終的にはきちんとサーバーまで届きます。この一連の流れを意識できれば、ネットワークのトラブルシューティングをするときにも「今どの段階で問題が起きているのか」を切り分けやすくなります。</p>
     `
   }
 ];
