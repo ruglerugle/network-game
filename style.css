@@ -634,36 +634,42 @@ body::before {
 .seq-status.seq-wait { background: #fff4df; color: #8a5a12; }
 .seq-status.seq-ok { background: var(--ok); color: var(--tok); }
 
-/* ---------- maze map (final stage) ---------- */
-.maze-map {
-  display: flex;
-  align-items: center;
-  gap: 4px;
+/* ---------- maze grid (final stage) ---------- */
+.maze-grid {
+  display: grid;
+  grid-auto-rows: 26px;
+  gap: 2px;
   overflow-x: auto;
-  padding: 6px 2px 18px;
-  margin-bottom: 4px;
-}
-.maze-node {
-  flex-shrink: 0;
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  gap: 4px;
-  min-width: 84px;
-  padding: 10px 8px;
+  padding: 4px;
+  margin: 10px 0 4px;
+  background: #0a1120;
   border-radius: 10px;
-  border: 2px solid var(--line);
-  background: #fff;
-  text-align: center;
 }
-.maze-icon { font-size: 1.4rem; }
-.maze-label { font-size: 0.7rem; font-weight: 900; color: var(--muted); }
-.maze-node.done { border-color: var(--bok); background: var(--ok); }
-.maze-node.done .maze-label { color: var(--tok); }
-.maze-node.current { border-color: var(--gold); background: #fff8e1; outline: 2px solid var(--gold); outline-offset: -4px; }
-.maze-node.current .maze-label { color: #8a6d00; }
-.maze-node.locked { opacity: 0.5; }
-.maze-arrow { flex-shrink: 0; color: var(--muted); font-size: 1.1rem; }
+.maze-cell {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 3px;
+  font-size: 0.75rem;
+  line-height: 1;
+}
+.maze-cell.wall { background: #060a12; }
+.maze-cell.path { background: #d9e2ec; }
+.maze-cell.path.visited { background: #c3d4e6; }
+.maze-cell.path.cp-hint { background: #eaf1fb; opacity: 0.55; }
+.maze-cell.path.cp-done { background: var(--ok); opacity: 1; }
+.maze-cell.current {
+  background: #fff8e1 !important;
+  outline: 2px solid var(--gold);
+  outline-offset: -2px;
+  opacity: 1;
+}
+.maze-cell.maze-cell-move {
+  cursor: pointer;
+  box-shadow: 0 0 0 2px var(--fac) inset;
+}
+.maze-cell.maze-cell-move:hover { background: var(--ac) !important; }
+.maze-packet { font-size: 1.1rem; }
 
 /* ---------- character dialogue (ねこ先生 / うさ美) ---------- */
 .dialog-scene {
