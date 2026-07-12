@@ -75,6 +75,12 @@ const GLOSSARY = [
   { term: "OSI参照モデル", def: "通信を7つの階層に分けて役割分担する考え方。" },
   { term: "PDU", def: "各階層でやり取りされるデータのまとまりを指す一般的な呼び方（Protocol Data Unit）。層によってビット・フレーム・パケット・セグメント・データと名前が変わる。" },
   { term: "カプセル化", def: "上位層から下位層に渡る際、各層が自分の役割に必要なヘッダーを付け足していく処理。" },
+  { term: "DHCP", def: "機器がネットワークに接続した瞬間に、IPアドレスなどの設定を自動的に配布する仕組み（Dynamic Host Configuration Protocol）。" },
+  { term: "DORA", def: "DHCPでIPアドレスが決まるまでの4段階のやり取り（Discover→Offer→Request→Acknowledge）の頭文字。" },
+  { term: "リース期間", def: "DHCPで割り当てられたIPアドレスの貸出期間。無期限ではなく、期限が近づくと更新が必要。" },
+  { term: "プライベートIPアドレス", def: "家庭や社内など限られたネットワークの中だけで使われるIPアドレス。ローカルIPアドレスとも呼ぶ。" },
+  { term: "グローバルIPアドレス", def: "インターネット上で他とかぶらない、世界で一意なIPアドレス。" },
+  { term: "APIPA", def: "DHCPサーバーが見つからないとき、機器が自分で169.254.0.0/16の範囲から仮のIPアドレスを選ぶ機能。" },
   { term: "キャッシュDNSサーバー", def: "クライアントの代わりに再帰的に問い合わせを行い、結果を一定時間保存するDNSサーバー。フルサービスリゾルバとも呼ぶ。" },
   { term: "フルサービスリゾルバ", def: "キャッシュDNSサーバーの正式名称。クライアントに代わって、答えが出るまで再帰的に問い合わせを行う。" },
   { term: "権威DNSサーバー", def: "特定のドメインについて、実際のレコードを管理・保持している「本人」にあたるDNSサーバー。" },
@@ -253,6 +259,7 @@ function finishGame() {
     <div class="dialog-scene">${renderDialogue(CLEAR_DIALOGUE)}</div>
     <ul class="explain-list">
       <li><b>OSI参照モデル</b>：通信を7つの階層（L1〜L7）に分けて役割分担する考え方</li>
+      <li><b>DHCP</b>：ネットワークに接続した瞬間、IPアドレスなどを自動で配布するDORAの仕組み</li>
       <li><b>DNS（L7）</b>：ドメイン名をIPアドレスに変換する「電話帳」の役割</li>
       <li><b>HTTP（L7）</b>：リクエスト/レスポンスでやり取りするメソッドとステータスコード</li>
       <li><b>TLS/HTTPS</b>：公開鍵暗号で共通鍵を安全に渡してから暗号化通信を行う仕組み</li>
@@ -426,7 +433,75 @@ function renderOsiStage(container, onComplete) {
 }
 
 /* =========================================================
-   ステージ2: DNS解決
+   ステージ2: DHCP（IPアドレスの自動割り当て）
+========================================================= */
+const DHCP_SEQUENCE = [
+  { key: "discover", label: "DHCPDISCOVER（「DHCPサーバーはいませんか？」とブロードキャスト）", from: "client" },
+  { key: "offer", label: "DHCPOFFER（「このIPアドレスはどうですか？」と提案）", from: "server" },
+  { key: "request", label: "DHCPREQUEST（「そのIPアドレスをください」と要求）", from: "client" },
+  { key: "ack", label: "DHCPACK（貸し出しを確定し、設定情報を送付）", from: "server" }
+];
+const DHCP_DISTRACTORS = [
+  { key: "arp", label: "ARP（MACアドレスを問い合わせる）" },
+  { key: "dnsq", label: "DNS問い合わせ（ドメイン名を調べる）" }
+];
+
+function renderDhcpStage(container, onComplete) {
+  let step = 0;
+
+  container.innerHTML = `
+    <div class="panel">
+      <p>PCやスマホがネットワークに接続すると、まず<b>DHCP</b>という仕組みでIPアドレスなどの設定を自動的に受け取ります。正しい順番でボタンを押してください。</p>
+      <div class="handshake-lane">
+        <div class="actor"><span class="icon">💻</span>新しく接続した機器</div>
+        <div class="timeline" id="dhcp-timeline"></div>
+        <div class="actor"><span class="icon">📡</span>DHCPサーバー<br>（多くはルーター）</div>
+      </div>
+      <div class="option-pool" id="dhcp-pool"></div>
+      <div class="feedback" id="dhcp-feedback"></div>
+    </div>
+  `;
+
+  const timeline = container.querySelector("#dhcp-timeline");
+  const pool = container.querySelector("#dhcp-pool");
+  const feedback = container.querySelector("#dhcp-feedback");
+
+  const pooled = shuffle([...DHCP_SEQUENCE, ...DHCP_DISTRACTORS]);
+  pooled.forEach((item) => {
+    const btn = document.createElement("button");
+    btn.type = "button";
+    btn.className = "choice-btn";
+    btn.textContent = item.label;
+    btn.onclick = () => handleClick(item, btn);
+    pool.appendChild(btn);
+  });
+
+  function handleClick(item, btn) {
+    const expected = DHCP_SEQUENCE[step];
+    if (item.key === expected.key) {
+      btn.remove();
+      const stepEl = document.createElement("div");
+      stepEl.className = `timeline-step from-${expected.from}`;
+      stepEl.textContent = `${step + 1}. ${expected.label}`;
+      timeline.appendChild(stepEl);
+      feedback.textContent = "正しい順番です！";
+      feedback.className = "feedback ok";
+      addScore(10);
+      step++;
+      if (step >= DHCP_SEQUENCE.length) {
+        feedback.textContent = "DHCPによるIPアドレスの割り当て（DORA）が完了！これで通信の準備が整いました。";
+        pool.innerHTML = "";
+        appendNextButton(container.querySelector(".panel"), onComplete);
+      }
+    } else {
+      feedback.textContent = "順番が違います。まず新しい機器は何をブロードキャストするか考えてみましょう。";
+      feedback.className = "feedback ng";
+    }
+  }
+}
+
+/* =========================================================
+   ステージ3: DNS解決
 ========================================================= */
 const DNS_ROUNDS = [
   { type: "lookup", domain: "www.example.com", ip: "93.184.216.34" },
@@ -1492,6 +1567,38 @@ const STAGES = [
       </table>
       <p>データを送信するとき、上位層から下位層に渡るたびに、各層が自分の役割に必要な<b>ヘッダー情報</b>を付け足していきます。この処理を<b>カプセル化（Encapsulation）</b>と呼びます。例えば「アプリのデータ」に<b>TCPヘッダー</b>（ポート番号など）が付くと<b>セグメント</b>、そこに<b>IPヘッダー</b>（IPアドレスなど）が付くと<b>パケット</b>、さらに<b>イーサネットヘッダー</b>（MACアドレスなど）が付くと<b>フレーム</b>と呼ばれ、最終的に電気信号（ビット）として送出されます。受信側では逆に、下位層から順にヘッダーを取り除いていく<b>非カプセル化（Decapsulation）</b>が行われます。</p>
       <p>実務では、これをさらに簡略化した<b>TCP/IPモデル（4階層）</b>もよく使われます。OSIのL7〜L5をまとめて「アプリケーション層」、L4を「トランスポート層」、L3を「インターネット層」、L2・L1をまとめて「ネットワークインターフェース層」と呼びます。呼び方が違っても、考え方は同じです。この後のステージでも、それぞれの内容がOSIの何層に対応するかを見出しの横に表示していきます。</p>
+    `
+  },
+  {
+    title: "DHCP（IPアドレスの自動割り当て）",
+    icon: "🔌",
+    layer: "L7 アプリケーション層",
+    sub: "機器がネットワークにつながった瞬間の設定を知ろう",
+    render: renderDhcpStage,
+    dialogue: [
+      { who: "cat", img: "cat", text: "DNSの前に、実はもっと手前の話があるんだ。そもそも、あなたのスマホやパソコンは、どうやって自分の<strong>IPアドレス</strong>を知るんだと思う？" },
+      { who: "rabbit", img: "rabbit", text: "確かに……！IPアドレスって、誰かに教えてもらわないと分からないですよね？" },
+      { who: "cat", img: "catThink", text: "そう。Wi-FiやLANケーブルでネットワークにつながった瞬間、<strong>DHCP（Dynamic Host Configuration Protocol）</strong>という仕組みが自動的にIPアドレスや必要な設定を配ってくれるんだ。家庭やオフィスでは、たいていルーターがこのDHCPサーバーの役割を兼ねているよ。" },
+      { who: "rabbit", img: "rabbitThink", text: "自動でIPアドレスがもらえるなんて便利ですね。どうやって決まるんですか？" },
+      { who: "cat", img: "cat", text: "<strong>DORA</strong>と呼ばれる4段階のやり取りで決まるんだ。実際に順番を組み立てて体験してみよう！" }
+    ],
+    explainTitle: "DHCPは「IPアドレスの自動配布係」",
+    explainBody: `
+      <p>PCやスマホをWi-Fi・LANに接続すると、通常は何も設定しなくても自動的にインターネットへアクセスできます。これは、<b>DHCP（Dynamic Host Configuration Protocol）</b>が接続の瞬間にIPアドレスなどの必要な設定を自動的に配布してくれているからです。DHCPはUDPの67番（サーバー側）・68番（クライアント側）を使う<b>L7 アプリケーション層</b>のプロトコルです。</p>
+      <p>DHCPでIPアドレスが決まるまでの流れは、頭文字をとって<b>DORA</b>と呼ばれる4段階のやり取りで進みます。</p>
+      <ol class="explain-list">
+        <li><b>Discover</b>：まだIPアドレスを持たないクライアントが、ネットワーク全体に向けて「DHCPサーバーはいませんか？」とブロードキャストで呼びかける</li>
+        <li><b>Offer</b>：呼びかけを受けたDHCPサーバーが「このIPアドレスを使いませんか？」と候補を提案する</li>
+        <li><b>Request</b>：クライアントが「そのIPアドレスをください」と、提案されたIPアドレスを正式に要求する（これもブロードキャストで送られ、複数のDHCPサーバーがあっても選ばれなかったサーバーは提案を取り下げられる）</li>
+        <li><b>Acknowledge</b>：サーバーが貸し出しを確定し、IPアドレスに加えて<b>サブネットマスク・デフォルトゲートウェイ・DNSサーバーのアドレス</b>なども一緒に伝える</li>
+      </ol>
+      <p>こうして割り当てられたIPアドレスには<b>リース期間（貸出期間）</b>が設定されており、無期限ではありません。期限が近づくとクライアントは同じDHCPサーバーに更新（リニュー）を依頼し、使われなくなったIPアドレスは他の機器に再び割り当てられるようになります。</p>
+      <p>割り当てられるIPアドレスには、大きく分けて2種類があります。</p>
+      <ul class="explain-list">
+        <li><b>プライベートIPアドレス（ローカルIPアドレス）</b>：家庭や社内など、限られたネットワークの中だけで使われるIPアドレス（10.0.0.0/8、172.16.0.0/12、192.168.0.0/16の範囲）。ルーターがDHCPサーバーとして、家庭内の各機器にこの範囲のIPアドレスを配ります。</li>
+        <li><b>グローバルIPアドレス</b>：インターネット上で他とかぶらない、世界で一意なIPアドレス。多くの家庭では、ルーター自体がプロバイダ（ISP）のDHCPサーバーから1つだけグローバルIPアドレスを借り受け、家庭内の複数の機器はNATを通じてそのグローバルIPアドレスを共有します。</li>
+      </ul>
+      <p>なお、何らかの理由でDHCPサーバーが見つからない場合、多くの機器は<b>169.254.0.0/16</b>という範囲から自分で仮のIPアドレスを選ぶ<b>APIPA（Automatic Private IP Addressing）</b>という機能を持っています。この場合、同じネットワーク内の機器同士の通信はできても、インターネットには接続できません。</p>
     `
   },
   {
