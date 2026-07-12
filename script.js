@@ -1327,212 +1327,101 @@ function renderFirewallStage(container, onComplete) {
 }
 
 /* =========================================================
-   ステージ11: 配送ルート最終試験（迷路）
+   ステージ11: 配送ルート最終試験（拠点をつなげる）
 ========================================================= */
-const MAZE_COLS = 7;
-const MAZE_ROWS = 5;
-const MAZE_CHECKPOINT_LABELS = [
-  { icon: "📖", label: "DNS解決" },
-  { icon: "📡", label: "ルーティング" },
-  { icon: "🔀", label: "スイッチング" },
-  { icon: "🤝", label: "TCPハンドシェイク" },
-  { icon: "🔒", label: "TLSハンドシェイク" },
-  { icon: "📄", label: "HTTPリクエスト送信" },
-  { icon: "🧱", label: "ファイアウォール通過" }
+const ROUTE_NODES = [
+  { key: "client", icon: "🖥️", label: "クライアント" },
+  { key: "dns", icon: "📖", label: "DNS解決" },
+  { key: "router", icon: "📡", label: "ルーティング" },
+  { key: "switch", icon: "🔀", label: "スイッチング" },
+  { key: "tcp", icon: "🤝", label: "TCPハンドシェイク" },
+  { key: "tls", icon: "🔒", label: "TLSハンドシェイク" },
+  { key: "http", icon: "📄", label: "HTTPリクエスト送信" },
+  { key: "firewall", icon: "🧱", label: "ファイアウォール通過" },
+  { key: "server", icon: "🗄️", label: "サーバー" }
+];
+const ROUTE_SLOT_CLIENT = [10, 14];
+const ROUTE_SLOT_SERVER = [86, 82];
+const ROUTE_SLOTS_MIDDLE = [
+  [34, 10], [68, 14], [14, 44], [50, 40], [82, 32], [30, 76], [66, 70]
 ];
 
-// シード付き擬似乱数（毎回レイアウトの違う、しかし必ず解ける迷路を作るため）
-function createMazeRng(seed) {
-  let s = seed >>> 0;
-  return function () {
-    s |= 0;
-    s = (s + 0x6d2b79f5) | 0;
-    let t = Math.imul(s ^ (s >>> 15), 1 | s);
-    t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t;
-    return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
-  };
-}
+function renderRouteMapStage(container, onComplete) {
+  const middleKeys = shuffle(ROUTE_NODES.slice(1, -1).map((n) => n.key));
+  const slots = shuffle(ROUTE_SLOTS_MIDDLE);
+  const positions = new Map();
+  positions.set("client", ROUTE_SLOT_CLIENT);
+  positions.set("server", ROUTE_SLOT_SERVER);
+  middleKeys.forEach((key, i) => positions.set(key, slots[i]));
 
-// 再帰的バックトラッキングで「完全迷路」を生成する。
-// 全マスがちょうど1本の道でつながる木構造になるため、近道（別ルート）が原理的に存在しない。
-function generateMazeCells(cols, rows, rng) {
-  const cells = Array.from({ length: rows }, () =>
-    Array.from({ length: cols }, () => ({ N: false, S: false, E: false, W: false, visited: false }))
-  );
-  const DIRS = [
-    ["N", 0, -1, "S"],
-    ["S", 0, 1, "N"],
-    ["E", 1, 0, "W"],
-    ["W", -1, 0, "E"]
-  ];
-  const stack = [[0, 0]];
-  cells[0][0].visited = true;
-  while (stack.length) {
-    const [x, y] = stack[stack.length - 1];
-    const options = DIRS.map(([dir, dx, dy, opp]) => ({ dir, opp, nx: x + dx, ny: y + dy })).filter(
-      (o) => o.nx >= 0 && o.nx < cols && o.ny >= 0 && o.ny < rows && !cells[o.ny][o.nx].visited
-    );
-    if (options.length === 0) {
-      stack.pop();
-      continue;
-    }
-    const pick = options[Math.floor(rng() * options.length)];
-    cells[y][x][pick.dir] = true;
-    cells[pick.ny][pick.nx][pick.opp] = true;
-    cells[pick.ny][pick.nx].visited = true;
-    stack.push([pick.nx, pick.ny]);
-  }
-  return cells;
-}
+  let currentIndex = 0;
+  const connections = [];
 
-// 木構造なのでスタートからゴールへの道は必ずただ1つ。BFSでその道をたどる。
-function findMazeSolution(cells, cols, rows) {
-  const goalKey = `${cols - 1},${rows - 1}`;
-  const prev = new Map([["0,0", null]]);
-  const queue = [[0, 0]];
-  while (queue.length) {
-    const [x, y] = queue.shift();
-    const cell = cells[y][x];
-    const nbrs = [];
-    if (cell.N) nbrs.push([x, y - 1]);
-    if (cell.S) nbrs.push([x, y + 1]);
-    if (cell.E) nbrs.push([x + 1, y]);
-    if (cell.W) nbrs.push([x - 1, y]);
-    for (const [nx, ny] of nbrs) {
-      const key = `${nx},${ny}`;
-      if (!prev.has(key)) {
-        prev.set(key, [x, y]);
-        queue.push([nx, ny]);
-      }
-    }
-  }
-  const path = [];
-  let curKey = goalKey;
-  while (curKey !== null) {
-    const [x, y] = curKey.split(",").map(Number);
-    path.push([x, y]);
-    const p = prev.get(curKey);
-    curKey = p ? p.join(",") : null;
-  }
-  return path.reverse();
-}
+  function buildBoard() {
+    const lines = connections
+      .map(([fromKey, toKey]) => {
+        const [x1, y1] = positions.get(fromKey);
+        const [x2, y2] = positions.get(toKey);
+        return `<line x1="${x1}" y1="${y1}" x2="${x2}" y2="${y2}" />`;
+      })
+      .join("");
 
-function renderMazeStage(container, onComplete) {
-  const rng = createMazeRng(Date.now() ^ Math.floor(Math.random() * 1e9));
-  const cells = generateMazeCells(MAZE_COLS, MAZE_ROWS, rng);
-  const solution = findMazeSolution(cells, MAZE_COLS, MAZE_ROWS);
-  const optimalMoves = solution.length - 1;
+    const nodes = ROUTE_NODES.map((node, idx) => {
+      const [x, y] = positions.get(node.key);
+      const state = idx < currentIndex ? "done" : idx === currentIndex ? "current" : "todo";
+      return `<button type="button" class="net-node ${state}" data-node="${node.key}" style="left:${x}%; top:${y}%;">
+        <span class="net-node-icon">${node.icon}</span>
+        <span class="net-node-label">${node.label}</span>
+      </button>`;
+    }).join("");
 
-  // 論理セル(x,y)は描画グリッド上の(2x,2y)に対応し、通路が開いているマス目同士の
-  // 間(2x+1,2y)や(2x,2y+1)も歩けるマスとして地図に加える。
-  const walkable = new Set();
-  for (let y = 0; y < MAZE_ROWS; y++) {
-    for (let x = 0; x < MAZE_COLS; x++) {
-      walkable.add(`${2 * x},${2 * y}`);
-      const cell = cells[y][x];
-      if (cell.E) walkable.add(`${2 * x + 1},${2 * y}`);
-      if (cell.S) walkable.add(`${2 * x},${2 * y + 1}`);
-    }
-  }
-  const renderCols = 2 * MAZE_COLS - 1;
-  const renderRows = 2 * MAZE_ROWS - 1;
-  const startKey = "0,0";
-  const goalKey = `${2 * (MAZE_COLS - 1)},${2 * (MAZE_ROWS - 1)}`;
-
-  // チェックポイントを解答ルート上に順番どおり均等配置する
-  const checkpointMap = new Map();
-  const n = MAZE_CHECKPOINT_LABELS.length;
-  const usedIdx = new Set();
-  for (let i = 0; i < n; i++) {
-    let idx = Math.round(((i + 1) / (n + 1)) * (solution.length - 1));
-    idx = Math.max(1, Math.min(solution.length - 2, idx));
-    while (usedIdx.has(idx) && idx < solution.length - 2) idx++;
-    usedIdx.add(idx);
-    const [lx, ly] = solution[idx];
-    checkpointMap.set(`${2 * lx},${2 * ly}`, MAZE_CHECKPOINT_LABELS[i]);
-  }
-
-  let pos = [0, 0];
-  const visited = new Set([startKey]);
-  const passedCheckpoints = new Set();
-  let moveCount = 0;
-
-  function neighborsOf([c, r]) {
-    return [[c, r - 1], [c, r + 1], [c - 1, r], [c + 1, r]].filter(([nc, nr]) => walkable.has(`${nc},${nr}`));
-  }
-
-  function buildGrid() {
-    const posKey = pos.join(",");
-    let html = `<div class="maze-grid" style="grid-template-columns: repeat(${renderCols}, 26px);">`;
-    for (let r = 0; r < renderRows; r++) {
-      for (let c = 0; c < renderCols; c++) {
-        const key = `${c},${r}`;
-        if (!walkable.has(key)) {
-          html += `<div class="maze-cell wall"></div>`;
-          continue;
-        }
-        const isCurrent = key === posKey;
-        const cp = checkpointMap.get(key);
-        let content = "";
-        let extra = "";
-        if (key === startKey) content = "🖥️";
-        if (key === goalKey) content = "🗄️";
-        if (cp) {
-          content = cp.icon;
-          extra += passedCheckpoints.has(key) ? " cp-done" : " cp-hint";
-        }
-        if (visited.has(key)) extra += " visited";
-        if (isCurrent) content = '<span class="maze-packet">📦</span>';
-        html += `<div class="maze-cell path${isCurrent ? " current" : ""}${extra}" data-cell="${key}">${content}</div>`;
-      }
-    }
-    html += `</div>`;
-    return html;
+    return `
+      <div class="net-board">
+        <svg class="net-lines" viewBox="0 0 100 100" preserveAspectRatio="none">${lines}</svg>
+        ${nodes}
+      </div>
+      <div class="feedback" id="net-feedback"></div>
+    `;
   }
 
   function render() {
-    const posKey = pos.join(",");
-    if (checkpointMap.has(posKey) && !passedCheckpoints.has(posKey)) {
-      passedCheckpoints.add(posKey);
-      addScore(10);
-    }
-
     container.innerHTML = "";
     const wrap = document.createElement("div");
     wrap.className = "panel";
 
-    const nbrs = neighborsOf(pos);
-    let status;
-    if (posKey === goalKey) {
-      status =
-        moveCount <= optimalMoves
-          ? `🎉 サーバーに到着！${moveCount}手で最短ルート（${optimalMoves}手）ぴったりだったね！`
-          : `🎉 サーバーに到着！${moveCount}手かかったよ（最短は${optimalMoves}手）。`;
-    } else if (checkpointMap.has(posKey)) {
-      status = `✔ ${checkpointMap.get(posKey).label} を通過！ 次の分かれ道はどっちだろう？`;
-    } else if (posKey !== startKey && nbrs.length === 1) {
-      status = "🚧 行き止まり！さっきの分かれ道まで戻ろう。";
-    } else {
-      status = "分かれ道。マス目をタップして進もう。";
-    }
+    const doneAll = currentIndex === ROUTE_NODES.length - 1;
+    const status = doneAll
+      ? "🎉 サーバーまで正しくつながった！これが1つの通信が実際にたどるネットワーク図だよ。"
+      : currentIndex === 0
+      ? "クライアントから、次にどの拠点へつながる？ 拠点をタップして線をつなげよう。"
+      : `✔ ${ROUTE_NODES[currentIndex].label} とつながった！ 次はどこだろう？`;
 
-    wrap.innerHTML = `<p>${status}</p>${buildGrid()}`;
+    wrap.innerHTML = `<p>${status}</p>${buildBoard()}`;
     container.appendChild(wrap);
 
-    if (posKey === goalKey) {
+    if (doneAll) {
       appendNextButton(wrap, onComplete);
       return;
     }
 
-    nbrs.forEach(([nc, nr]) => {
-      const cellEl = wrap.querySelector(`[data-cell="${nc},${nr}"]`);
-      if (!cellEl) return;
-      cellEl.classList.add("maze-cell-move");
-      cellEl.onclick = () => {
-        pos = [nc, nr];
-        visited.add(`${nc},${nr}`);
-        moveCount++;
-        render();
+    const feedback = wrap.querySelector("#net-feedback");
+
+    ROUTE_NODES.forEach((node, idx) => {
+      if (idx <= currentIndex) return;
+      const el = wrap.querySelector(`[data-node="${node.key}"]`);
+      if (!el) return;
+      el.onclick = () => {
+        if (idx === currentIndex + 1) {
+          connections.push([ROUTE_NODES[currentIndex].key, node.key]);
+          currentIndex++;
+          addScore(10);
+          render();
+        } else {
+          feedback.textContent = `✕ まだ「${node.label}」にはつながらないよ。順番を考えてみよう。`;
+          feedback.className = "feedback ng";
+          el.classList.add("net-node-wrong");
+          setTimeout(() => el.classList.remove("net-node-wrong"), 400);
+        }
       };
     });
   }
@@ -2030,12 +1919,12 @@ const STAGES = [
     title: "配送ルート最終試験",
     icon: "🧩",
     layer: "総復習",
-    sub: "学んだ順番で、データが通る道をたどろう",
-    render: renderMazeStage,
+    sub: "拠点を正しい順番でつなげて、ネットワーク図を完成させよう",
+    render: renderRouteMapStage,
     dialogue: [
-      { who: "cat", img: "cat", text: "さあ、いよいよ最終試験だよ！ここまで学んだ知識を総動員して、データがクライアントからサーバーに届くまでの<strong>正しい道順</strong>を、迷路のようにたどってみよう。" },
-      { who: "rabbit", img: "rabbit", text: "分かれ道がいっぱいありそうで緊張します……順番、ちゃんと覚えてるかな。" },
-      { who: "cat", img: "catThink", text: "大丈夫、間違えても「行き止まり」に気づいたらすぐ引き返せるよ。DNSで住所を調べるところから始めて、最後はファイアウォールを通ってサーバーに到着するまで、正しい道を選んでいこう！" },
+      { who: "cat", img: "cat", text: "さあ、いよいよ最終試験だよ！盤面には、DNSサーバーやルーター、スイッチ、サーバーなど、これまで学んだ拠点がバラバラに置かれている。ここまで学んだ知識を総動員して、クライアントからサーバーまで<strong>正しい順番</strong>で線をつなげてみよう。" },
+      { who: "rabbit", img: "rabbit", text: "拠点はどの順番でタップしてもいいんですか？" },
+      { who: "cat", img: "catThink", text: "うん、自由にタップしていいよ。ただし、正しい順番の拠点じゃないとつながらないんだ。間違えても大丈夫、何度でもやり直せるから、DNSで住所を調べるところから始めて、最後はファイアウォールを通ってサーバーに到着するまでの道のりを組み立ててみよう！" },
       { who: "rabbit", img: "rabbitThink", text: "よーし、やってみます！" }
     ],
     explainTitle: "データが通った道のり",

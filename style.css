@@ -634,42 +634,65 @@ body::before {
 .seq-status.seq-wait { background: #fff4df; color: #8a5a12; }
 .seq-status.seq-ok { background: var(--ok); color: var(--tok); }
 
-/* ---------- maze grid (final stage) ---------- */
-.maze-grid {
-  display: grid;
-  grid-auto-rows: 26px;
-  gap: 2px;
-  overflow-x: auto;
-  padding: 4px;
+/* ---------- route map (final stage) ---------- */
+.net-board {
+  position: relative;
+  width: 100%;
+  height: 320px;
   margin: 10px 0 4px;
   background: #0a1120;
   border-radius: 10px;
+  overflow: hidden;
 }
-.maze-cell {
+.net-lines {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+}
+.net-lines line {
+  stroke: var(--gold);
+  stroke-width: 0.8;
+  stroke-linecap: round;
+}
+.net-node {
+  position: absolute;
+  transform: translate(-50%, -50%);
   display: flex;
+  flex-direction: column;
   align-items: center;
-  justify-content: center;
-  border-radius: 3px;
-  font-size: 0.75rem;
-  line-height: 1;
-}
-.maze-cell.wall { background: #060a12; }
-.maze-cell.path { background: #d9e2ec; }
-.maze-cell.path.visited { background: #c3d4e6; }
-.maze-cell.path.cp-hint { background: #eaf1fb; opacity: 0.55; }
-.maze-cell.path.cp-done { background: var(--ok); opacity: 1; }
-.maze-cell.current {
-  background: #fff8e1 !important;
-  outline: 2px solid var(--gold);
-  outline-offset: -2px;
-  opacity: 1;
-}
-.maze-cell.maze-cell-move {
+  gap: 2px;
+  width: 68px;
+  padding: 6px 4px;
+  border-radius: 10px;
+  border: 2px solid var(--line);
+  background: #fff;
+  font-family: var(--f);
   cursor: pointer;
-  box-shadow: 0 0 0 2px var(--fac) inset;
+  text-align: center;
 }
-.maze-cell.maze-cell-move:hover { background: var(--ac) !important; }
-.maze-packet { font-size: 1.1rem; }
+.net-node-icon { font-size: 1.2rem; line-height: 1; }
+.net-node-label { font-size: 0.62rem; font-weight: 900; color: var(--muted); line-height: 1.2; }
+.net-node.done { border-color: var(--bok); background: var(--ok); cursor: default; }
+.net-node.done .net-node-label { color: var(--tok); }
+.net-node.current {
+  border-color: var(--gold);
+  background: #fff8e1;
+  outline: 2px solid var(--gold);
+  outline-offset: -4px;
+  cursor: default;
+}
+.net-node.todo:hover { border-color: var(--fac); background: var(--ac); }
+.net-node.net-node-wrong {
+  border-color: var(--bng) !important;
+  background: var(--ng) !important;
+  animation: net-node-shake 0.4s;
+}
+@keyframes net-node-shake {
+  0%, 100% { transform: translate(-50%, -50%); }
+  25% { transform: translate(calc(-50% - 4px), -50%); }
+  75% { transform: translate(calc(-50% + 4px), -50%); }
+}
 
 /* ---------- character dialogue (ねこ先生 / うさ美) ---------- */
 .dialog-scene {
