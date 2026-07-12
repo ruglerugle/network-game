@@ -5,7 +5,6 @@
 ========================================================= */
 const state = {
   stageIndex: -1,
-  maxReached: 0,
   completed: new Set(),
   score: 0
 };
@@ -47,14 +46,12 @@ backBtn.onclick = () => {
 
 function renderSideNav() {
   stepList.innerHTML = STAGES.map((stage, i) => {
-    const reached = i <= state.maxReached;
     const isActive = i === state.stageIndex;
     const isDone = state.completed.has(i);
     const classes = ["side-step"];
     if (isActive) classes.push("active");
     if (isDone) classes.push("done");
-    if (!reached) classes.push("locked");
-    const statusIcon = isDone ? '<span class="check">✔</span>' : !reached ? '<span class="lock">🔒</span>' : "";
+    const statusIcon = isDone ? '<span class="check">✔</span>' : "";
     return `<div class="${classes.join(" ")}" data-index="${i}">
       <span class="paw">${stage.icon}</span>
       <div>
@@ -67,9 +64,7 @@ function renderSideNav() {
 
   stepList.querySelectorAll(".side-step").forEach((el) => {
     const i = Number(el.dataset.index);
-    if (i <= state.maxReached) {
-      el.addEventListener("click", () => startStage(i));
-    }
+    el.addEventListener("click", () => startStage(i));
   });
 }
 
@@ -213,7 +208,6 @@ function showExplain(title, bodyHtml, onNext) {
 ========================================================= */
 function startStage(index) {
   state.stageIndex = index;
-  state.maxReached = Math.max(state.maxReached, index);
   updateHud();
   renderSideNav();
   window.scrollTo(0, 0);
@@ -1947,7 +1941,6 @@ const STAGES = [
 document.getElementById("start-btn").onclick = () => {
   document.getElementById("start-modal").classList.add("hidden");
   state.score = 0;
-  state.maxReached = 0;
   state.completed = new Set();
   addScore(0);
   startStage(0);
@@ -1956,7 +1949,6 @@ document.getElementById("start-btn").onclick = () => {
 document.getElementById("restart-btn").onclick = () => {
   document.getElementById("end-modal").classList.add("hidden");
   state.score = 0;
-  state.maxReached = 0;
   state.completed = new Set();
   addScore(0);
   startStage(0);

@@ -179,10 +179,8 @@ body::before {
   color: #fff;
 }
 .side-step.done .paw { color: var(--gold); }
-.side-step.locked { opacity: 0.55; cursor: default; pointer-events: none; }
 .paw { font-size: 18px; }
 .check { font-size: 16px; color: #51d184; }
-.lock { font-size: 15px; color: #e8dfc9; }
 .step-main { font-size: 13px; font-weight: 950; line-height: 1.2; }
 .step-sub { font-size: 11px; margin-top: 2px; line-height: 1.3; color: #dbe8f3; font-weight: 700; }
 
