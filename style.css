@@ -758,9 +758,7 @@ body::before {
   line-height: 1.85;
   font-weight: 800;
   min-height: 60px;
-  display: flex;
-  flex-direction: column;
-  justify-content: center;
+  align-content: center;
 }
 .dialog-bubble::before {
   content: "";
